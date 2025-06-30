@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS Variables */
+:root {
+  --accent-yellow: #FFD700;
+  --accent-red: #dc2626;
+  --accent-blue: #2563eb;
+  --accent-green: #16a34a;
+  --text-dark: #111827;
+  --text-medium: #374151;
+  --text-light: #6B7280;
+  --border-light: #D1D5DB;
+}
+
+/* Custom Components */
+@layer components {
+  .input-search {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-base;
+    background-color: #ffffff;
+    color: var(--text-dark);
+  }
+
+  .btn-yellow {
+    @apply px-6 py-3 rounded-lg hover:bg-yellow-400 transition-colors font-semibold;
+    background-color: var(--accent-yellow);
+    color: #232323;
+  }
+
+  .divider-curve {
+    @apply absolute bottom-0 left-0 right-0;
+  }
+
+  .accent-yellow {
+    color: var(--accent-yellow);
+  }
+}
+
+/* Mobile Responsive Improvements */
+@layer utilities {
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Mobile-first responsive text */
+  .text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
+  .text-heading-responsive {
+    @apply text-lg sm:text-xl lg:text-2xl xl:text-3xl;
+  }
+
+  /* Mobile-friendly touch targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Improved mobile spacing */
+  .mobile-padding {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .mobile-margin {
+    @apply mx-4 sm:mx-6 lg:mx-8;
+  }
+
+  /* Mobile-optimized cards */
+  .mobile-card {
+    @apply rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  /* Mobile-friendly buttons */
+  .mobile-button {
+    @apply px-4 py-3 sm:px-6 sm:py-3 rounded-lg font-medium transition-all duration-200 touch-target;
+  }
+
+  /* Responsive grid layouts */
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6;
+  }
+
+  .responsive-grid-2 {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6;
+  }
+
+  /* Mobile navigation improvements */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #ffffff;
+    border-top: 1px solid var(--border-light);
+    z-index: 40;
+  }
+
+  /* Form improvements for mobile */
+  .mobile-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-light);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .mobile-input:focus {
+    outline: none;
+    border-color: var(--accent-red);
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+  }
+
+  /* Mobile-optimized modals */
+  .mobile-modal {
+    @apply fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4;
+  }
+
+  .mobile-modal-content {
+    background-color: #ffffff;
+    width: 100%;
+    border-radius: 1rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    transform: translateY(0);
+    transition: all 0.3s ease-out;
+  }
+}
+
+/* Base styles */
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: linear-gradient(135deg, #000000 0%, #111111 100%);
+    min-height: 100vh;
+    color: #ffffff;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    color: #ffffff;
+  }
+}
+
+/* Modal and popup styles */
+.modal-content-light {
+  background-color: #ffffff;
+  color: var(--text-dark);
+  padding: 1.5rem;
+}
+
+.modal-content-light h1,
+.modal-content-light h2,
+.modal-content-light h3,
+.modal-content-light h4,
+.modal-content-light h5,
+.modal-content-light h6 {
+  color: var(--text-dark);
+}
+
+.modal-content-light p,
+.modal-content-light span,
+.modal-content-light div {
+  color: var(--text-medium);
+}
+
+.modal-content-light label {
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+.modal-content-light input,
+.modal-content-light textarea,
+.modal-content-light select {
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  color: var(--text-dark);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.modal-content-light input::placeholder,
+.modal-content-light textarea::placeholder,
+.modal-content-light select::placeholder {
+  color: var(--text-light);
+}
+
+.modal-content-light input:focus,
+.modal-content-light textarea:focus,
+.modal-content-light select:focus {
+  outline: none;
+  border-color: var(--accent-red);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+
+.modal-content-light button:not([class*="bg-"]) {
+  color: var(--text-medium);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-red);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b91c1c;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent-red);
+  color: #ffffff;
+}
+
+/* Focus styles */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent-red);
+  outline-offset: 2px;
+}
+
+/* Marquee animation for rolling text */
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 20s linear infinite;
+}

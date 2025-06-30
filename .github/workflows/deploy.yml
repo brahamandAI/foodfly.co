@@ -1,0 +1,119 @@
+name: 🚀 Deploy Foodfly Application
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # ===================================
+  # BUILD & TEST JOB
+  # ===================================
+  build-and-test:
+    name: 🔨 Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: |
+        npm ci
+        
+    - name: 🔍 Run Lint Check
+      run: npm run lint
+      
+    - name: 🏗️ Build Application
+      run: npm run build
+      env:
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+        RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+
+    - name: 📤 Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-files
+        path: .next/
+
+  # ===================================
+  # DEPLOY JOB (VERCEL)
+  # ===================================
+  deploy-vercel:
+    name: 🚀 Deploy to Vercel
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: npm ci
+
+    - name: 🚀 Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+
+  # ===================================
+  # HEALTH CHECK JOB
+  # ===================================
+  health-check:
+    name: 🏥 Post-Deployment Health Check
+    needs: deploy-vercel
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: 🔍 Health Check
+      run: |
+        echo "⏰ Waiting for deployment to be ready..."
+        sleep 30
+        
+        echo "🏥 Checking application health..."
+        curl -f ${{ secrets.NEXT_PUBLIC_APP_URL }}/api/test || exit 1
+        
+        echo "✅ Health check passed!"
+
+  # ===================================
+  # NOTIFICATION JOB
+  # ===================================
+  notify:
+    name: 📢 Send Notifications
+    needs: [build-and-test, deploy-vercel, health-check]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📢 Deployment Status
+      run: |
+        if [ "${{ needs.deploy-vercel.result }}" == "success" ] && [ "${{ needs.health-check.result }}" == "success" ]; then
+          echo "🎉 Deployment successful!"
+          echo "🌐 Application is live at: ${{ secrets.NEXT_PUBLIC_APP_URL }}"
+        else
+          echo "❌ Deployment failed!"
+          exit 1 
