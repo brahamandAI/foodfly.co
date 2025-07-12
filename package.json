@@ -27,6 +27,7 @@
   ],
   "dependencies": {
     "@headlessui/react": "^1.7.17",
+    "@react-oauth/google": "^0.12.2",
     "@tanstack/react-query": "^5.80.7",
     "@tanstack/react-query-devtools": "^5.80.7",
     "@types/node": "^20.0.0",
@@ -49,6 +50,7 @@
     "google-auth-library": "^10.0.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.290.0",
     "mongoose": "^7.1.0",
     "morgan": "^1.10.0",

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Lock, UserIcon, X } from 'lucide-react';
+import { Mail, Lock, UserIcon, X, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { authApi, enhancedCartService } from '@/lib/api';
+import Image from 'next/image';
 
 function LoginPageContent() {
   const [isLogin, setIsLogin] = useState(true);
@@ -171,27 +172,88 @@ function LoginPageContent() {
     }
   };
 
+  // Add this function for guest login (placeholder for now)
+  const handleGuestLogin = () => {
+    // Create a guest user object
+    const guestUser = {
+      id: 'guest_' + Date.now(),
+      name: 'Guest User',
+      email: 'guest@foodfly.com',
+      isGuest: true
+    };
+
+    // Set guest session in localStorage
+    localStorage.setItem('guest', 'true');
+    localStorage.setItem('user', JSON.stringify(guestUser));
+    localStorage.setItem('isLoggedIn', 'true');
+
+    // Trigger auth state change event
+    window.dispatchEvent(new CustomEvent('authStateChanged', {
+      detail: { isLoggedIn: true, user: guestUser }
+    }));
+
+    // Show success message
+    toast.success('Welcome! You are now logged in as a guest.');
+
+    // Redirect to home page
+    router.push('/');
+  };
+
   const inputClasses = `w-full px-4 py-3 pl-10 text-gray-900 placeholder-gray-500 bg-white border rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200`;
   const errorInputClasses = `w-full px-4 py-3 pl-10 text-gray-900 placeholder-gray-500 bg-white border border-red-500 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md relative transform transition-all shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Background Images */}
+      <div className="fixed inset-0 z-0 overflow-hidden">
+        {/* Thali Image */}
+        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[120%]">
+          <Image
+            src="/images/hero-vegthali.jpg"
+            alt="Veg Thali"
+            fill
+            className="object-cover"
+            priority
+            quality={100}
+          />
+        </div>
+        {/* Burger Image */}
+        <div className="absolute -top-[10%] right-[0%] w-[60%] h-[120%]">
+          <Image
+            src="/images/hero-burger.jpg"
+            alt="Burger"
+            fill
+            className="object-cover"
+            priority
+            quality={100}
+          />
+        </div>
+        {/* Blur Overlay */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-md"></div>
+      </div>
+
+      {/* Auth Container */}
+      <div className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-8 flex flex-col items-center animate-fade-in backdrop-blur-xl bg-white/60 dark:bg-gray-900/60">
         {/* Close/Back button */}
         <button
           onClick={() => router.push('/')}
-          className="absolute right-4 top-4 p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+          className="absolute right-4 top-4 p-2 hover:bg-red-600/20 rounded-full transition-colors duration-200"
         >
-          <X className="h-5 w-5 text-gray-500" />
+          <X className="h-5 w-5 text-gray-400" />
         </button>
 
-        <div className="p-8">
+        <div className="w-full">
+          {/* Logo */}
+          <div className="mb-4 flex justify-center">
+            <Image src="/images/logo.png" alt="FoodFly Logo" width={60} height={60} className="rounded-full shadow-md border-2 border-yellow-400 bg-white" />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {isLogin ? 'Welcome Back!' : 'Create Account'}
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white drop-shadow mb-2">
+              {isLogin ? 'Sign In' : 'Create Account'}
             </h2>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-gray-700 dark:text-gray-200">
               {isLogin 
                 ? 'Sign in to access your account' 
                 : 'Join us and start ordering delicious food'}
@@ -202,7 +264,7 @@ function LoginPageContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                   Full Name
                 </label>
                 <div className="relative">
@@ -214,19 +276,20 @@ function LoginPageContent() {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={errors.name ? errorInputClasses : inputClasses}
+                    className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.name ? 'border-red-500' : ''}`}
                     placeholder="John Doe"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.name && (
-                  <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.name}</p>
                 )}
               </div>
             )}
 
+            {/* Email field */}
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Email Address
               </label>
               <div className="relative">
@@ -238,18 +301,19 @@ function LoginPageContent() {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={errors.email ? errorInputClasses : inputClasses}
+                  className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.email ? 'border-red-500' : ''}`}
                   placeholder="you@example.com"
                   disabled={isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                <p className="mt-1 text-sm text-red-400">{errors.email}</p>
               )}
             </div>
 
+            {/* Password field */}
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                 Password
               </label>
               <div className="relative">
@@ -261,19 +325,20 @@ function LoginPageContent() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={errors.password ? errorInputClasses : inputClasses}
+                  className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.password ? 'border-red-500' : ''}`}
                   placeholder="••••••••"
                   disabled={isLoading}
                 />
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                <p className="mt-1 text-sm text-red-400">{errors.password}</p>
               )}
             </div>
 
+            {/* Confirm Password field (for registration) */}
             {!isLogin && (
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -285,62 +350,82 @@ function LoginPageContent() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className={errors.confirmPassword ? errorInputClasses : inputClasses}
+                    className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                     placeholder="••••••••"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.confirmPassword}</p>
                 )}
               </div>
             )}
 
-            {errors.submit && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                <p className="text-sm text-red-600 text-center">{errors.submit}</p>
-              </div>
-            )}
-
+            {/* Submit button */}
             <button
               type="submit"
-              className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 ${
-                isLoading ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
               disabled={isLoading}
+              className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-white py-3 rounded-xl font-semibold text-lg shadow hover:from-yellow-500 hover:to-yellow-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <>
+                <span className="flex items-center justify-center">
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {isLogin ? 'Signing in...' : 'Creating account...'}
-                </>
+                  Processing...
+                </span>
               ) : (
                 isLogin ? 'Sign In' : 'Create Account'
               )}
             </button>
 
+            {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-gray-300/30 dark:border-gray-700/30"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  {isLogin ? "Don't have an account?" : "Already have an account?"}
-                </span>
+                <span className="px-2 text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-gray-900/60">Or continue with</span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="w-full py-3 px-4 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-200"
-            >
-              {isLogin ? 'Create an Account' : 'Sign In Instead'}
-            </button>
+            {/* Social Login Buttons */}
+            <div className="space-y-4">
+              {/* Google Login Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.loading('Connecting to Google...');
+                  // TODO: Implement Google login
+                }}
+                className="w-full flex items-center justify-center gap-3 bg-white/90 text-gray-800 py-3 rounded-xl font-semibold shadow hover:bg-white transition-all duration-200 border border-gray-300/30"
+              >
+                <Image src="/google-icon.svg" alt="Google" width={20} height={20} />
+                Continue with Google
+              </button>
+
+              {/* Guest Login Button */}
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                className="w-full flex items-center justify-center gap-3 bg-white/70 dark:bg-gray-800/70 border border-gray-300/50 dark:border-gray-600/50 text-gray-800 dark:text-white py-3 rounded-xl font-semibold shadow hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
+              >
+                <User className="h-5 w-5" />
+                Continue as Guest
+              </button>
+            </div>
           </form>
+
+          {/* Toggle between login and register */}
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-yellow-500 hover:text-yellow-400 font-medium transition-colors duration-200"
+            >
+              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

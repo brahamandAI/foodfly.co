@@ -1,5 +1,6 @@
 'use client';
 
+import React from "react";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,6 +11,7 @@ import AuthPopup from '../components/AuthPopup';
 import LocationSelector from '../components/LocationSelector';
 import { toast } from 'react-hot-toast';
 import { logout } from '@/lib/api';
+import SignupPopup from '../components/SignupPopup';
 
 interface Restaurant {
   _id: string;
@@ -74,6 +76,7 @@ export default function HomePage() {
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [cartItemCount, setCartItemCount] = useState(0);
+  const [showSignupPopup, setShowSignupPopup] = useState(true);
 
   // Mock data for testing
   const mockRestaurants: Restaurant[] = [
@@ -136,9 +139,23 @@ export default function HomePage() {
   useEffect(() => {
     // Check authentication status
     const token = localStorage.getItem('token');
-    if (token) {
+    const isGuest = localStorage.getItem('guest');
+    
+    if (token || isGuest) {
       setIsAuthenticated(true);
+      if (token) {
       loadUserData();
+      } else if (isGuest) {
+        // Load guest user data from localStorage
+        const guestUser = localStorage.getItem('user');
+        if (guestUser) {
+          try {
+            setCurrentUser(JSON.parse(guestUser));
+          } catch (error) {
+            console.error('Error parsing guest user data:', error);
+          }
+        }
+      }
     }
 
     // Load restaurants
@@ -189,9 +206,15 @@ export default function HomePage() {
   };
 
   const handleAuthStateChange = (e: CustomEvent) => {
-    setIsAuthenticated(e.detail.isAuthenticated);
-    if (e.detail.isAuthenticated) {
+    setIsAuthenticated(e.detail.isLoggedIn);
+    if (e.detail.isLoggedIn) {
+      if (e.detail.user && e.detail.user.isGuest) {
+        // Handle guest user
+        setCurrentUser(e.detail.user);
+      } else {
+        // Handle regular user
       loadUserData();
+      }
     } else {
       setCurrentUser(null);
     }
@@ -269,13 +292,13 @@ export default function HomePage() {
     }
   };
 
-  const handleAuthSuccess = (user: any) => {
-    setCurrentUser(user);
-    setIsAuthenticated(true);
+  const handleAuthSuccess = () => {
+    // The AuthPopup will handle the authentication state changes
+    // We just need to close the popup and update local state
     setShowAuthPopup(false);
     updateCartCount();
     loadDefaultLocation(); // Reload location after login
-    toast.success(`Welcome back, ${user.name}!`);
+    toast.success('Welcome back!');
   };
 
   // Use centralized logout function instead of local implementation
@@ -327,6 +350,8 @@ export default function HomePage() {
   };
 
   return (
+    <React.Fragment>
+      <SignupPopup isOpen={showSignupPopup} onClose={() => setShowSignupPopup(false)} />
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="bg-black relative min-h-[600px] flex flex-col justify-center">
@@ -362,19 +387,21 @@ export default function HomePage() {
               </div>
             </div>
             
-            {/* Search Form */}
-            <form onSubmit={handleSearch} className="flex items-center max-w-md mx-auto md:mx-0 mt-6">
-              <input
-                type="text"
-                className="input-search flex-1"
-                placeholder="Search Keywords (e.g. Pizza, Burger...)"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              <button type="submit" className="btn-yellow ml-2 flex items-center justify-center">
-                <Search className="h-5 w-5" />
-              </button>
-            </form>
+              {/* Menu & Deals Quick Access (replaces Search Form) */}
+              <div className="flex items-center justify-center md:justify-start gap-6 mt-6">
+                <a href="/menu" className="flex flex-col items-center group">
+                  <span className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-yellow-400 to-red-500 shadow-lg group-hover:scale-110 transition-transform">
+                    <Utensils className="h-7 w-7 text-white" />
+                  </span>
+                  <span className="mt-2 text-sm font-semibold text-yellow-300 group-hover:text-yellow-200 transition-colors">Menu</span>
+                </a>
+                <a href="/deals" className="flex flex-col items-center group">
+                  <span className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-red-500 to-yellow-400 shadow-lg group-hover:scale-110 transition-transform">
+                    <Flame className="h-7 w-7 text-white animate-bounce" />
+                  </span>
+                  <span className="mt-2 text-sm font-semibold text-red-300 group-hover:text-yellow-200 transition-colors">Deals</span>
+                </a>
+              </div>
 
             {/* AI Features Quick Access */}
             <div className="flex flex-wrap gap-3 mt-6">
@@ -651,29 +678,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Smart Recommendations Section */}
-      {isAuthenticated && (
-        <section className="py-16 bg-white">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Smart Recommendations</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">Discover personalized food recommendations based on your preferences and current context.</p>
-            </div>
-            <SmartRecommendations 
-              userId={currentUser?._id || 'default'} 
-              location={selectedLocation?.name}
-              maxRecommendations={6}
-              showTrending={true}
-              showContext={true}
-              onAddToCart={(item) => {
-                console.log('Adding to cart:', item);
-                // Cart functionality will be handled by the component
-              }}
-            />
-          </div>
-        </section>
-      )}
-
       {/* Modals */}
       {showAuthPopup && (
         <AuthPopup
@@ -718,5 +722,6 @@ export default function HomePage() {
         />
       )}
     </div>
+  </React.Fragment>
   );
 } 
