@@ -128,6 +128,10 @@ export default function OrdersPage() {
     }
   };
 
+  useEffect(() => {
+    fetchOrders();
+  }, [selectedFilter]); // Refetch when filter changes
+
   const filterOptions = [
     { value: 'all', label: 'All Orders', count: orders.length },
     { value: 'active', label: 'Active Orders', count: orders.filter(o => ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status)).length },
@@ -135,16 +139,21 @@ export default function OrdersPage() {
     { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length }
   ];
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
       
+      // Build query parameters based on selected filter
+      const params = new URLSearchParams();
+      if (selectedFilter === 'cancelled') {
+        params.append('status', 'cancelled');
+      } else if (selectedFilter !== 'all') {
+        params.append('status', selectedFilter);
+      }
+      // Note: cancelled orders are excluded by default unless status=cancelled
+      
       // Fetch orders from database API
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`/api/orders?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
@@ -210,13 +219,13 @@ export default function OrdersPage() {
 
   const handleReorder = async (order: Order) => {
     try {
-      // Clear current cart first
-      const { cartService } = require('@/lib/api');
-      await cartService.clearCart();
+      // Clear current cart first and add items using unified cart service
+      const { unifiedCartService } = require('@/lib/api');
+      await unifiedCartService.clearCart();
       
-      // Add items to cart using database API
+      // Add items to cart using unified cart service
       for (const orderItem of order.items) {
-        await cartService.addToCart(
+        await unifiedCartService.addToCart(
           orderItem.menuItem._id,
           orderItem.menuItem.name,
           `Delicious ${orderItem.menuItem.name}`,
@@ -238,17 +247,13 @@ export default function OrdersPage() {
   };
 
   const filteredOrders = orders.filter(order => {
-    const matchesFilter = selectedFilter === 'all' || 
-      (selectedFilter === 'active' && ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)) ||
-      (selectedFilter === 'delivered' && order.status === 'delivered') ||
-      (selectedFilter === 'cancelled' && order.status === 'cancelled');
-
+    // Server-side filtering handles status filters, we only need to handle search
     const matchesSearch = searchQuery === '' || 
       order.restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.items.some(item => item.menuItem.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchesFilter && matchesSearch;
+    return matchesSearch;
   });
 
   const formatDate = (dateString: string) => {

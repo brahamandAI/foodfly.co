@@ -176,6 +176,430 @@ export interface Order {
   updatedAt: Date;
 }
 
+// UNIFIED CART SERVICE - Works for both guest and authenticated users
+export const unifiedCartService = {
+  // Check if user is authenticated (real token, not guest)
+  isAuthenticated: (): boolean => {
+    const token = localStorage.getItem('token');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    return !!(token && !isGuest);
+  },
+
+  // Check if user is logged in (includes guests)
+  isLoggedIn: (): boolean => {
+    const token = localStorage.getItem('token');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    const isLoggedInStatus = localStorage.getItem('isLoggedIn') === 'true';
+    return !!((token && !isGuest) || (isGuest && isLoggedInStatus));
+  },
+
+  // Get current user ID (works for both guest and authenticated)
+  getCurrentUserId: (): string => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        const userData = JSON.parse(user);
+        return userData._id || userData.id || 'guest';
+      } catch (error) {
+        return 'guest';
+      }
+    }
+    return 'guest';
+  },
+
+  // Get cart - uses database for authenticated users, localStorage for guests
+  getCart: async (): Promise<{ items: any[]; subtotal: number; totalItems: number }> => {
+    if (unifiedCartService.isAuthenticated()) {
+      // Use database for authenticated users
+      try {
+        const token = localStorage.getItem('token');
+        console.log('Fetching cart from database for authenticated user');
+        
+        const response = await fetch('/api/cart', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Database cart fetch failed:', response.status, errorText);
+          throw new Error(`Failed to fetch cart from database: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Database cart data received:', data);
+        
+        return {
+          items: data.cart.items || [],
+          subtotal: data.cart.subtotal || 0,
+          totalItems: data.cart.totalItems || 0,
+          restaurantId: data.cart.restaurantId,
+          restaurantName: data.cart.restaurantName
+        };
+      } catch (error) {
+        console.error('Database cart error, falling back to localStorage:', error);
+        return unifiedCartService.getLocalCart();
+      }
+    } else {
+      // Use localStorage for guests
+      console.log('Using localStorage cart for guest user');
+      return unifiedCartService.getLocalCart();
+    }
+  },
+
+  // Get cart from localStorage
+  getLocalCart: (): { items: any[]; subtotal: number; totalItems: number; restaurantId?: string; restaurantName?: string } => {
+    try {
+      const userId = unifiedCartService.getCurrentUserId();
+      const cartKey = `cart_${userId}`;
+      const cartData = localStorage.getItem(cartKey);
+      
+      if (!cartData) {
+        return { items: [], subtotal: 0, totalItems: 0, restaurantId: undefined, restaurantName: undefined };
+      }
+
+      const cart = JSON.parse(cartData);
+      return {
+        items: cart.items || [],
+        subtotal: cart.subtotal || 0,
+        totalItems: cart.totalItems || 0,
+        restaurantId: cart.restaurantId,
+        restaurantName: cart.restaurantName
+      };
+    } catch (error) {
+      console.error('Error getting local cart:', error);
+      return { items: [], subtotal: 0, totalItems: 0, restaurantId: undefined, restaurantName: undefined };
+    }
+  },
+
+  // Add item to cart
+  addToCart: async (menuItemId: string, name: string, description: string, price: number, quantity: number, image: string, restaurantId: string, restaurantName: string, customizations: any[] = []): Promise<void> => {
+    console.log('Adding to cart:', { menuItemId, name, quantity, isAuthenticated: unifiedCartService.isAuthenticated() });
+    
+    if (unifiedCartService.isAuthenticated()) {
+      // Use database for authenticated users (PERMANENT STORAGE)
+      const token = localStorage.getItem('token');
+      
+      console.log('Using database cart for authenticated user');
+      
+      const response = await fetch('/api/cart', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          menuItemId,
+          name,
+          description,
+          price,
+          quantity,
+          image,
+          restaurantId,
+          restaurantName,
+          customizations
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Database cart error:', error);
+        throw new Error(error.error || 'Failed to add item to cart');
+      }
+      
+      console.log('Item successfully added to database cart');
+    } else {
+      // Use localStorage for guests and unauthenticated users
+      console.log('Using localStorage cart for guest user');
+      unifiedCartService.addToLocalCart(menuItemId, name, description, price, quantity, image, restaurantId, restaurantName, customizations);
+    }
+
+    // Trigger cart update event
+    window.dispatchEvent(new Event('cartUpdated'));
+  },
+
+  // Add item to localStorage cart
+  addToLocalCart: (menuItemId: string, name: string, description: string, price: number, quantity: number, image: string, restaurantId: string, restaurantName: string, customizations: any[] = []): void => {
+    try {
+      const userId = unifiedCartService.getCurrentUserId();
+      const cartKey = `cart_${userId}`;
+      const cart = unifiedCartService.getLocalCart();
+
+      console.log('Adding to local cart:', { menuItemId, name, quantity, currentCart: cart });
+
+      // Check if item already exists (using both menuItemId and name for better matching)
+      const existingItemIndex = cart.items.findIndex(item => 
+        (item.menuItemId === menuItemId || item.name === name) && 
+        JSON.stringify(item.customizations || []) === JSON.stringify(customizations || [])
+      );
+
+      if (existingItemIndex > -1) {
+        // Update existing item
+        cart.items[existingItemIndex].quantity += quantity;
+        console.log('Updated existing item:', cart.items[existingItemIndex]);
+      } else {
+        // Add new item
+        const newItem = {
+          menuItemId,
+          name,
+          description: description || '',
+          price,
+          quantity,
+          image: image || '',
+          restaurantId,
+          restaurantName,
+          customizations: customizations || [],
+          addedAt: new Date().toISOString()
+        };
+        cart.items.push(newItem);
+        console.log('Added new item:', newItem);
+      }
+
+      // Recalculate totals
+      cart.subtotal = cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      cart.totalItems = cart.items.reduce((total, item) => total + item.quantity, 0);
+      cart.restaurantId = restaurantId;
+      cart.restaurantName = restaurantName;
+
+      console.log('Final cart state:', cart);
+
+      // Save to localStorage with error handling
+      try {
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        console.log('Cart saved to localStorage successfully');
+      } catch (storageError) {
+        console.error('Failed to save to localStorage:', storageError);
+        // Clear some space and try again
+        localStorage.removeItem('testCart');
+        localStorage.removeItem('guestCart');
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+      }
+    } catch (error) {
+      console.error('Error adding to local cart:', error);
+      throw error;
+    }
+  },
+
+  // Update item quantity
+  updateItemQuantity: async (menuItemId: string, quantity: number): Promise<void> => {
+    if (unifiedCartService.isAuthenticated()) {
+      // Use database for authenticated users
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/cart/items/${menuItemId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ quantity }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update cart item');
+      }
+    } else {
+      // Use localStorage for guests
+      unifiedCartService.updateLocalItemQuantity(menuItemId, quantity);
+    }
+
+    // Trigger cart update event
+    window.dispatchEvent(new Event('cartUpdated'));
+  },
+
+  // Update item quantity in localStorage
+  updateLocalItemQuantity: (menuItemId: string, quantity: number): void => {
+    try {
+      const userId = unifiedCartService.getCurrentUserId();
+      const cartKey = `cart_${userId}`;
+      const cart = unifiedCartService.getLocalCart();
+
+      const itemIndex = cart.items.findIndex(item => item.menuItemId === menuItemId);
+      
+      if (itemIndex > -1) {
+        if (quantity <= 0) {
+          // Remove item
+          cart.items.splice(itemIndex, 1);
+        } else {
+          // Update quantity
+          cart.items[itemIndex].quantity = quantity;
+        }
+
+        // Recalculate totals
+        cart.subtotal = cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        cart.totalItems = cart.items.reduce((total, item) => total + item.quantity, 0);
+
+        // Save to localStorage
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+      }
+    } catch (error) {
+      console.error('Error updating local cart item:', error);
+      throw error;
+    }
+  },
+
+  // Remove item from cart
+  removeFromCart: async (menuItemId: string): Promise<void> => {
+    if (unifiedCartService.isAuthenticated()) {
+      // Use database for authenticated users
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/cart/items/${menuItemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove item from cart');
+      }
+    } else {
+      // Use localStorage for guests
+      unifiedCartService.updateLocalItemQuantity(menuItemId, 0);
+    }
+
+    // Trigger cart update event
+    window.dispatchEvent(new Event('cartUpdated'));
+  },
+
+  // Clear cart
+  clearCart: async (): Promise<void> => {
+    if (unifiedCartService.isAuthenticated()) {
+      // Use database for authenticated users
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('/api/cart', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to clear cart');
+      }
+    } else {
+      // Clear localStorage cart for guests
+      const userId = unifiedCartService.getCurrentUserId();
+      const cartKey = `cart_${userId}`;
+      localStorage.removeItem(cartKey);
+    }
+
+    // Trigger cart update event
+    window.dispatchEvent(new Event('cartUpdated'));
+  },
+
+  // Get cart count for header
+  getCartCount: async (): Promise<number> => {
+    try {
+      const cart = await unifiedCartService.getCart();
+      return cart.totalItems;
+    } catch (error) {
+      console.error('Error getting cart count:', error);
+      return 0;
+    }
+  },
+
+  // Migrate guest cart to authenticated user on login
+  migrateGuestCartOnLogin: async (): Promise<void> => {
+    try {
+      if (!unifiedCartService.isAuthenticated()) {
+        console.log('User not authenticated, skipping cart migration');
+        return;
+      }
+
+      console.log('Starting cart migration for authenticated user');
+      
+      // Look for cart data in various possible localStorage keys
+      const possibleCartKeys = [
+        'cart_guest',
+        'cart',
+        'guestCart', 
+        'testCart',
+        'foodfly_cart'
+      ];
+      
+      let migratedItemsCount = 0;
+      
+      for (const cartKey of possibleCartKeys) {
+        const cartData = localStorage.getItem(cartKey);
+        
+        if (cartData) {
+          try {
+            const cart = JSON.parse(cartData);
+            console.log(`Found cart data in ${cartKey}:`, cart);
+            
+            // Handle different cart data structures
+            const items = cart.items || [];
+            
+            if (items.length > 0) {
+              console.log(`Migrating ${items.length} items from ${cartKey}`);
+              
+              // Add each item to the authenticated user's database cart
+              for (const item of items) {
+                try {
+                  await unifiedCartService.addToCart(
+                    item.menuItemId || item.id,
+                    item.name,
+                    item.description || '',
+                    item.price,
+                    item.quantity,
+                    item.image || '',
+                    item.restaurantId,
+                    item.restaurantName,
+                    item.customizations || []
+                  );
+                  migratedItemsCount++;
+                } catch (error) {
+                  console.error('Error migrating cart item:', error);
+                }
+              }
+              
+              // Clear the guest/temp cart after successful migration
+              localStorage.removeItem(cartKey);
+              console.log(`Cleared ${cartKey} after migration`);
+            }
+          } catch (error) {
+            console.error(`Error parsing cart data from ${cartKey}:`, error);
+            // Remove corrupted cart data
+            localStorage.removeItem(cartKey);
+          }
+        }
+      }
+      
+      if (migratedItemsCount > 0) {
+        console.log(`Successfully migrated ${migratedItemsCount} items to user cart`);
+      } else {
+        console.log('No cart items found to migrate');
+      }
+      
+      // Always trigger cart update to refresh from database after login
+      window.dispatchEvent(new Event('cartUpdated'));
+      
+    } catch (error) {
+      console.error('Error migrating guest cart:', error);
+    }
+  },
+
+  // Load user cart from database after login (forces refresh)
+  loadUserCartFromDatabase: async (): Promise<void> => {
+    try {
+      if (unifiedCartService.isAuthenticated()) {
+        console.log('Loading user cart from database after login');
+        await unifiedCartService.getCart(); // This will fetch from database
+        window.dispatchEvent(new Event('cartUpdated'));
+      }
+    } catch (error) {
+      console.error('Error loading user cart from database:', error);
+    }
+  }
+};
+
 // Database cart service - uses actual API endpoints
 export const cartService = {
   getCart: async (): Promise<{ items: any[]; subtotal: number; totalItems: number }> => {
@@ -742,28 +1166,47 @@ export const logout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('guest');
     
-    // Clear user-specific data for security/privacy
+    // Clear user-specific localStorage data for security/privacy
+    // Note: For authenticated users, cart data is stored in database and should persist
     if (userId) {
       try {
-        userStorage.clearUserData(userId);
-      } catch (error) {
-        console.error('Error clearing user data:', error);
-        // Fallback to manual cleanup
+        // Clear only sensitive localStorage data, not database cart
         localStorage.removeItem(`user_addresses_${userId}`);
         localStorage.removeItem(`user_orders_${userId}`);
-        localStorage.removeItem(`foodfly_cart_${userId}`);
+        // Do NOT clear database cart - it should persist for next login
+      } catch (error) {
+        console.error('Error clearing user data:', error);
       }
     }
     
-    // Clear generic data that might contain user info
+    // Clear only guest/temporary data that should not persist
     localStorage.removeItem('selectedLocation');
     localStorage.removeItem('testCart');
     localStorage.removeItem('guestCart');
-    localStorage.removeItem('cart');
+    localStorage.removeItem('cart_guest'); // Clear guest cart
     localStorage.removeItem('userAddresses');
     localStorage.removeItem('userOrders');
     localStorage.removeItem('testMenuItems');
+    
+    // Clear temporary cart keys used by different services
+    const tempCartKeys = ['cart', 'foodfly_cart'];
+    tempCartKeys.forEach(key => {
+      const cartData = localStorage.getItem(key);
+      if (cartData) {
+        try {
+          const cart = JSON.parse(cartData);
+          // Only clear if it's clearly temporary/guest data
+          if (!cart.userId || cart.userId === 'guest') {
+            localStorage.removeItem(key);
+          }
+        } catch (error) {
+          // If we can't parse it, it's probably corrupted, so remove it
+          localStorage.removeItem(key);
+        }
+      }
+    });
     
     // Clear admin data if present
     localStorage.removeItem('adminToken');
@@ -1628,6 +2071,9 @@ export const authApi = {
       
       const { token, user } = response.data;
       
+      // Clear any existing guest state first
+      localStorage.removeItem('guest');
+      
       // Store token and user data
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -1689,6 +2135,9 @@ export const authApi = {
       }
       
       console.log('Extracted token and user:', { token: token?.substring(0, 20), user });
+      
+      // Clear any existing guest state first
+      localStorage.removeItem('guest');
       
       // Store token and user data
       localStorage.setItem('token', token);
@@ -2004,6 +2453,47 @@ export const adminApi = {
     } catch (error: any) {
       console.error('Error fetching dashboard stats:', error);
       throw new Error(error.response?.data?.error || 'Failed to fetch dashboard stats');
+    }
+  },
+
+  // Get all users
+  getAllUsers: async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('Admin authentication required');
+      
+      const response = await axiosInstance.get('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      return response.data.users;
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      throw new Error(error.response?.data?.error || 'Failed to fetch users');
+    }
+  },
+
+  // Update user status
+  updateUserStatus: async (userId: string, isActive: boolean) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) throw new Error('Admin authentication required');
+      
+      const response = await axiosInstance.patch(`/api/admin/users/${userId}`, 
+        { isActive },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      return response.data.user;
+    } catch (error: any) {
+      console.error('Error updating user status:', error);
+      throw new Error(error.response?.data?.error || 'Failed to update user status');
     }
   }
 };

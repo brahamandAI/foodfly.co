@@ -65,9 +65,8 @@ export default function RestaurantPage() {
   }, [restaurantId]);
 
   useEffect(() => {
-    if (isLoggedIn) {
-      loadCartData();
-    }
+    // Load cart data for all users (including guests)
+    loadCartData();
   }, [isLoggedIn]);
 
   const checkAuthAndLoadCart = async () => {
@@ -166,8 +165,8 @@ export default function RestaurantPage() {
       if (currentQuantity === 0) {
         await addToCart(menuItem, 1);
       } else {
-        const { cartService } = require('@/lib/api');
-        await cartService.updateItemQuantity(menuItem._id, newQuantity);
+        const { unifiedCartService } = require('@/lib/api');
+        await unifiedCartService.updateItemQuantity(menuItem._id, newQuantity);
       }
       
     } catch (error) {
@@ -196,15 +195,15 @@ export default function RestaurantPage() {
           return updated;
         });
         
-        const { cartService } = require('@/lib/api');
-        await cartService.removeFromCart(menuItem._id);
+        const { unifiedCartService } = require('@/lib/api');
+        await unifiedCartService.removeFromCart(menuItem._id);
       } else {
         // Decrease quantity
         const newQuantity = currentQuantity - 1;
         setCartItems(prev => ({ ...prev, [menuItem._id]: newQuantity }));
         
-        const { cartService } = require('@/lib/api');
-        await cartService.updateItemQuantity(menuItem._id, newQuantity);
+        const { unifiedCartService } = require('@/lib/api');
+        await unifiedCartService.updateItemQuantity(menuItem._id, newQuantity);
       }
       
     } catch (error) {
@@ -221,9 +220,9 @@ export default function RestaurantPage() {
     setIsAddingToCart(prev => ({ ...prev, [menuItem._id]: true }));
 
     try {
-      const { cartService } = require('@/lib/api');
+      const { unifiedCartService } = require('@/lib/api');
       
-      await cartService.addToCart(
+      await unifiedCartService.addToCart(
         menuItem._id,
         menuItem.name,
         menuItem.description || '',
@@ -249,12 +248,10 @@ export default function RestaurantPage() {
   };
 
   const loadCartData = async () => {
-    if (!isLoggedIn) return;
-    
     try {
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
-      const cartData = await cartService.getCart();
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
+      const cartData = await unifiedCartService.getCart();
       
       if (cartData && cartData.items) {
         const cartItemsMap = cartData.items.reduce((acc, item) => {

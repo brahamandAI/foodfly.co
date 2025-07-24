@@ -23,6 +23,8 @@ export interface IUser extends Document {
   phone?: string;
   role: 'customer' | 'admin' | 'user';
   isEmailVerified: boolean;
+  googleId?: string;
+  picture?: string;
   addresses: IAddress[];
   preferences: {
     dietary: string[];
@@ -129,6 +131,14 @@ const UserSchema = new Schema<IUser>({
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows null values to not conflict with unique constraint
+  },
+  picture: {
+    type: String
   },
   addresses: [AddressSchema],
   preferences: {

@@ -6,9 +6,15 @@ import { Mail, Lock, UserIcon, X, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { authApi, enhancedCartService } from '@/lib/api';
 import Image from 'next/image';
+import GoogleLoginButton from '@/components/GoogleLoginButton';
 
 function LoginPageContent() {
-  const [isLogin, setIsLogin] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
+  const mode = searchParams.get('mode'); // Check for signup mode
+  
+  const [isLogin, setIsLogin] = useState(mode !== 'signup'); // Default to signup if mode=signup
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -17,10 +23,6 @@ function LoginPageContent() {
     confirmPassword: ''
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
-  
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/';
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -76,6 +78,9 @@ function LoginPageContent() {
         const response = await authApi.login(formData.email, formData.password);
         
         if (response.token && response.user) {
+          // Clear any existing guest state first
+          localStorage.removeItem('guest');
+          
           localStorage.setItem('token', response.token);
           localStorage.setItem('user', JSON.stringify(response.user));
           localStorage.setItem('isLoggedIn', 'true');
@@ -102,8 +107,10 @@ function LoginPageContent() {
             console.error('Error loading user data:', error);
           }
           
-          // Initialize cart on login
-          await enhancedCartService.initializeCartOnLogin();
+          // Migrate guest cart and load user cart from database
+          const { unifiedCartService } = await import('@/lib/api');
+          await unifiedCartService.migrateGuestCartOnLogin();
+          await unifiedCartService.loadUserCartFromDatabase();
           
           // Redirect to the intended page
           router.push(decodeURIComponent(redirectUrl));
@@ -117,6 +124,9 @@ function LoginPageContent() {
         });
 
         if (response.token && response.user) {
+          // Clear any existing guest state first
+          localStorage.removeItem('guest');
+          
           localStorage.setItem('token', response.token);
           localStorage.setItem('user', JSON.stringify(response.user));
           localStorage.setItem('isLoggedIn', 'true');
@@ -172,7 +182,6 @@ function LoginPageContent() {
     }
   };
 
-  // Add this function for guest login (placeholder for now)
   const handleGuestLogin = () => {
     // Create a guest user object
     const guestUser = {
@@ -195,8 +204,13 @@ function LoginPageContent() {
     // Show success message
     toast.success('Welcome! You are now logged in as a guest.');
 
-    // Redirect to home page
-    router.push('/');
+    // Redirect to intended page or home
+    router.push(decodeURIComponent(redirectUrl));
+  };
+
+  const handleGoogleLoginSuccess = () => {
+    // Redirect to intended page after Google login
+    router.push(decodeURIComponent(redirectUrl));
   };
 
   const inputClasses = `w-full px-4 py-3 pl-10 text-gray-900 placeholder-gray-500 bg-white border rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200`;
@@ -393,17 +407,11 @@ function LoginPageContent() {
             {/* Social Login Buttons */}
             <div className="space-y-4">
               {/* Google Login Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  toast.loading('Connecting to Google...');
-                  // TODO: Implement Google login
-                }}
-                className="w-full flex items-center justify-center gap-3 bg-white/90 text-gray-800 py-3 rounded-xl font-semibold shadow hover:bg-white transition-all duration-200 border border-gray-300/30"
-              >
-                <Image src="/google-icon.svg" alt="Google" width={20} height={20} />
-                Continue with Google
-              </button>
+              <GoogleLoginButton
+                onSuccess={handleGoogleLoginSuccess}
+                text="Continue with Google"
+                className="bg-white/90 hover:bg-white border-gray-300/30 text-gray-800 py-3 font-semibold shadow"
+              />
 
               {/* Guest Login Button */}
               <button

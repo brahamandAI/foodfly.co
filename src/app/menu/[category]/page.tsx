@@ -177,12 +177,7 @@ export default function CategoryMenuPage() {
   };
 
   const updateQuantity = (itemName: string, change: number) => {
-    if (!isAuthenticated) {
-      // Show auth popup for non-authenticated users
-      (window as any).showAuthPopup?.();
-      return;
-    }
-
+    // Allow quantity updates for all users (including guests)
     const currentQty = quantities[itemName] || 0;
     const newQty = Math.max(0, currentQty + change);
     setQuantities((prev) => ({
@@ -202,30 +197,33 @@ export default function CategoryMenuPage() {
 
   const addToCart = async (item: { name: string; price: number }) => {
     try {
-      if (!isAuthenticated) {
-        setShowAuthPopup(true);
-        return;
-      }
-
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
       
-      await cartService.addToCart(
-        item.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now(),
+      const currentQty = quantities[item.name] || 1;
+      
+      await unifiedCartService.addToCart(
+        item.name.toLowerCase().replace(/\s+/g, '_') + '_menu',
         item.name,
         `Delicious ${item.name}`,
         Number(item.price) || 0,
-        1, // quantity
+        currentQty, // Use the selected quantity
         '/images/placeholder.svg',
-        'default_restaurant',
+        'foodfly_kitchen',
         'FoodFly Kitchen',
         [] // customizations
       );
       
+      // Update cart state
+      setCartItems((prev) => ({
+        ...prev,
+        [item.name]: { ...item, quantity: currentQty }
+      }));
+      
       // Update cart count in header
       window.dispatchEvent(new Event('cartUpdated'));
       
-      toast.success(`${item.name} added to cart!`);
+      toast.success(`${currentQty} ${item.name}(s) added to cart!`);
       
     } catch (error) {
       console.error('Error adding to cart:', error);

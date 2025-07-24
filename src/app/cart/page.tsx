@@ -52,9 +52,9 @@ export default function CartPage() {
     try {
       setIsLoading(true);
       
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
-      const cartData = await cartService.getCart();
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
+      const cartData = await unifiedCartService.getCart();
       
       if (cartData && cartData.items) {
         setCart({
@@ -101,8 +101,8 @@ export default function CartPage() {
       });
 
       // Background API call
-      const { cartService } = require('@/lib/api');
-      await cartService.updateItemQuantity(itemId, newQuantity);
+      const { unifiedCartService } = require('@/lib/api');
+      await unifiedCartService.updateItemQuantity(itemId, newQuantity);
       
     } catch (error) {
       console.error('Error updating quantity:', error);
@@ -132,8 +132,8 @@ export default function CartPage() {
       });
 
       // Background API call
-      const { cartService } = require('@/lib/api');
-      await cartService.removeFromCart(itemId);
+      const { unifiedCartService } = require('@/lib/api');
+      await unifiedCartService.removeFromCart(itemId);
       
     } catch (error) {
       console.error('Error removing item:', error);
@@ -149,10 +149,10 @@ export default function CartPage() {
     if (!confirm('Are you sure you want to clear your cart?')) return;
     
     try {
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
-      await cartService.clearCart();
-      await loadCart(); // Reload cart from database
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
+      await unifiedCartService.clearCart();
+      await loadCart(); // Reload cart from database or localStorage
     } catch (error) {
       console.error('Error clearing cart:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to clear cart';

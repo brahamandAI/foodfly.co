@@ -32,8 +32,10 @@ export default function ClientLayout({
     // Check authentication status without forcing login popup
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     
-    const authenticated = !!(token && userData);
+    const authenticated = !!((token && userData) || (isGuest && userData && isLoggedIn));
     setIsAuthenticated(authenticated);
     setIsLoading(false);
 
@@ -71,6 +73,10 @@ export default function ClientLayout({
   };
 
   const handleShowAuthPopup = () => {
+    // Don't show auth popup if user is already authenticated
+    if (isAuthenticated) {
+      return;
+    }
     setShowAuthPopup(true);
   };
 

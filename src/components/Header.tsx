@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, ShoppingCart, User, Menu, X, MapPin, Heart, Clock, LogOut, ChevronDown, Mic } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, MapPin, Heart, Clock, LogOut, LogIn, ChevronDown, Mic } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import LocationSelector from './LocationSelector';
 import VoiceAssistant from './VoiceAssistant';
@@ -41,8 +41,10 @@ export default function Header() {
     // Check authentication status
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    const authStatus = localStorage.getItem('isLoggedIn') === 'true';
     
-    if (token && userData) {
+    if ((token && userData) || (isGuest && userData && authStatus)) {
       setIsLoggedIn(true);
       setUser(JSON.parse(userData));
     }
@@ -52,11 +54,13 @@ export default function Header() {
 
     // Listen for storage changes (for auth state sync)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'isLoggedIn' || e.key === 'token' || e.key === 'user') {
+      if (e.key === 'isLoggedIn' || e.key === 'token' || e.key === 'user' || e.key === 'guest') {
         const newToken = localStorage.getItem('token');
         const newUserData = localStorage.getItem('user');
+        const newIsGuest = localStorage.getItem('guest') === 'true';
+        const newAuthStatus = localStorage.getItem('isLoggedIn') === 'true';
         
-        if (newToken && newUserData) {
+        if ((newToken && newUserData) || (newIsGuest && newUserData && newAuthStatus)) {
           setIsLoggedIn(true);
           setUser(JSON.parse(newUserData));
         } else {
@@ -71,13 +75,14 @@ export default function Header() {
 
     // Listen for custom auth state changes
     const handleAuthStateChange = (e: CustomEvent) => {
-      const { isLoggedIn: newAuthState } = e.detail;
+      const { isLoggedIn: newAuthState, user: newUser } = e.detail;
       if (newAuthState) {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
-        if (token && userData) {
+        const isGuest = localStorage.getItem('guest') === 'true';
+        if ((token && userData) || (isGuest && userData)) {
           setIsLoggedIn(true);
-          setUser(JSON.parse(userData));
+          setUser(newUser || JSON.parse(userData));
           // Reload location for logged-in user
           loadDefaultLocation();
         }
@@ -102,23 +107,31 @@ export default function Header() {
 
   const loadCartCount = async () => {
     try {
-      const { cartService } = await import('@/lib/api');
-      const cartData = await cartService.getCart();
-      setCartCount(cartData.totalItems || 0);
+      const { unifiedCartService } = await import('@/lib/api');
+      const cartCount = await unifiedCartService.getCartCount();
+      setCartCount(cartCount || 0);
     } catch (error) {
       console.error('Error loading cart count:', error);
+      setCartCount(0);
     }
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
-      loadCartCount();
-      
-      // Listen for cart updates - simple and direct
-      const handleCartUpdate = () => loadCartCount();
-      window.addEventListener('cartUpdated', handleCartUpdate);
-      return () => window.removeEventListener('cartUpdated', handleCartUpdate);
-    }
+    // Load cart count for all users (including guests)
+    loadCartCount();
+    
+    // Debounced cart update handler for better performance
+    let cartUpdateTimeout: NodeJS.Timeout;
+    const handleCartUpdate = () => {
+      clearTimeout(cartUpdateTimeout);
+      cartUpdateTimeout = setTimeout(loadCartCount, 300); // 300ms debounce
+    };
+    
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      clearTimeout(cartUpdateTimeout);
+    };
   }, [isLoggedIn]);
 
   const loadDefaultLocation = () => {
@@ -313,35 +326,64 @@ export default function Header() {
             {isLoggedIn ? (
               <div className="relative group">
                 <button className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors duration-200">
-                  <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                  <div className={`w-8 h-8 ${user?.isGuest ? 'bg-orange-600' : 'bg-red-600'} rounded-full flex items-center justify-center`}>
                     <User className="h-5 w-5 text-white" />
                   </div>
-                  <span className="hidden lg:block text-sm font-medium">{user?.name || 'User'}</span>
+                  <span className="hidden lg:block text-sm font-medium">
+                    {user?.isGuest ? 'Guest' : (user?.name || 'User')}
+                    {user?.isGuest && <span className="text-xs text-orange-400 ml-1">(Guest)</span>}
+                  </span>
                   <ChevronDown className="h-4 w-4 opacity-60 group-hover:opacity-100 transition-opacity" />
                 </button>
                 
                 {/* Dropdown Menu */}
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                    <User className="h-4 w-4 inline mr-2" />
-                    Profile
-                  </Link>
-                  <Link href="/orders" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                    <Clock className="h-4 w-4 inline mr-2" />
-                    Orders
-                  </Link>
-                  <Link href="/favorites" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                    <Heart className="h-4 w-4 inline mr-2" />
-                    Favorites
-                  </Link>
-                  <hr className="my-2" />
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOut className="h-4 w-4 inline mr-2" />
-                    Logout
-                  </button>
+                  {user?.isGuest ? (
+                    <>
+                      <div className="px-4 py-2 text-orange-600 font-medium border-b">
+                        <User className="h-4 w-4 inline mr-2" />
+                        Guest Mode
+                      </div>
+                      <button
+                        onClick={() => window.location.href = '/login'}
+                        className="block w-full text-left px-4 py-2 text-green-600 hover:bg-green-50 transition-colors"
+                      >
+                        <LogIn className="h-4 w-4 inline mr-2" />
+                        Sign Up / Login
+                      </button>
+                      <hr className="my-2" />
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4 inline mr-2" />
+                        Exit Guest Mode
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                        <User className="h-4 w-4 inline mr-2" />
+                        Profile
+                      </Link>
+                      <Link href="/orders" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                        <Clock className="h-4 w-4 inline mr-2" />
+                        Orders
+                      </Link>
+                      <Link href="/favorites" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                        <Heart className="h-4 w-4 inline mr-2" />
+                        Favorites
+                      </Link>
+                      <hr className="my-2" />
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4 inline mr-2" />
+                        Logout
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (

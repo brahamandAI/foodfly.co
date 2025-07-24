@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "@/components/ClientLayout";
+import GoogleOAuthProvider from "@/components/GoogleOAuthProvider";
 import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({ 
@@ -30,9 +31,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${poppins.variable} min-h-screen bg-black text-white font-inter antialiased`}>
-        <ClientLayout>
-            {children}
-        </ClientLayout>
+        <GoogleOAuthProvider>
+          <ClientLayout>
+              {children}
+          </ClientLayout>
+        </GoogleOAuthProvider>
         <Toaster
           position="top-right"
           toastOptions={{

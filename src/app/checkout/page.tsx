@@ -22,7 +22,8 @@ import {
   X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import AuthGuard from '@/components/AuthGuard';
+import RealUserGuard from '@/components/RealUserGuard';
+import PaymentModal from '@/components/PaymentModal';
 
 interface CartItem {
   id?: string;
@@ -111,6 +112,8 @@ export default function CheckoutPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('cod');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState<any>(null);
 
   useEffect(() => {
     loadCartData();
@@ -131,9 +134,9 @@ export default function CheckoutPage() {
 
   const loadCartData = async () => {
     try {
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
-      const cartData = await cartService.getCart();
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
+      const cartData = await unifiedCartService.getCart();
       
       if (cartData && cartData.items && cartData.items.length > 0) {
         setCart({
@@ -236,13 +239,33 @@ export default function CheckoutPage() {
   };
 
   const placeOrder = async () => {
-    if (!selectedAddress) {
-      toast.error('Please select a delivery address');
+    // Comprehensive authentication check
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const isGuest = localStorage.getItem('guest') === 'true';
+    
+    // Check if user is properly authenticated (not guest)
+    if (!token || !userData || !isLoggedIn || isGuest) {
+      toast.error('Please register or login to place an order. Guest users cannot place orders.');
+      return;
+    }
+    
+    // Additional check for user object
+    let userObj;
+    try {
+      userObj = JSON.parse(userData);
+      if (userObj.isGuest === true) {
+        toast.error('Please register or login to place an order. Guest users cannot place orders.');
+        return;
+      }
+    } catch (e) {
+      toast.error('Authentication error. Please login again.');
       return;
     }
 
-    if (!selectedPaymentMethod) {
-      toast.error('Please select a payment method');
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
       return;
     }
 
@@ -275,7 +298,7 @@ export default function CheckoutPage() {
           state: selectedAddress.state,
           pincode: selectedAddress.pincode
         },
-        paymentMethod: selectedPaymentMethod,
+        paymentMethod: selectedPaymentMethod === 'cod' ? 'cod' : 'pending', // Set COD immediately
         specialInstructions: specialInstructions,
         totalAmount: total
       };
@@ -283,21 +306,114 @@ export default function CheckoutPage() {
       console.log('Placing order with data:', orderData); // Debug log
 
       const response = await orderService.placeOrder(orderData);
+      console.log('Order creation response:', response); // Debug log
       
-      // Clear cart after successful order
-      const { cartService } = require('@/lib/api');
-      await cartService.clearCart();
+      if (!response.orderId) {
+        throw new Error('Order creation failed - no order ID received');
+      }
       
-      toast.success('Order placed successfully!');
-      router.push(`/checkout/success?orderId=${response.orderId}`);
+      // Handle COD orders differently - confirm directly without payment modal
+      if (selectedPaymentMethod === 'cod') {
+        try {
+          // Process COD payment directly
+          const paymentResponse = await fetch('/api/payment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              orderId: response.orderId,
+              paymentMethod: 'cod'
+            }),
+          });
+
+          if (!paymentResponse.ok) {
+            const error = await paymentResponse.json();
+            throw new Error(error.message || 'COD order confirmation failed');
+          }
+
+          // Clear cart after successful COD order
+          const { cartService } = require('@/lib/api');
+          await cartService.clearCart();
+          
+          toast.success('Order placed successfully! You can pay cash on delivery.');
+          router.push(`/checkout/success?orderId=${response.orderId}`);
+          return;
+          
+        } catch (error) {
+          console.error('Error processing COD order:', error);
+          toast.error('Failed to confirm COD order. Please try again.');
+          return;
+        }
+      }
+      
+      // For online payment methods, show payment modal
+      const orderForModal = {
+        id: response.orderId,
+        orderNumber: response.order?.orderNumber || `ORD${Date.now()}`,
+        totalAmount: total
+      };
+      
+      console.log('Setting current order:', orderForModal);
+      setCurrentOrder(orderForModal);
+      
+      console.log('Opening payment modal for order:', response.orderId);
+      setShowPaymentModal(true);
+      
+      console.log('Modal state set to:', true, 'currentOrder:', orderForModal);
       
     } catch (error) {
       console.error('Error placing order:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to place order';
-      toast.error(errorMessage);
+      
+      // Check if it's a Razorpay configuration error
+      if (errorMessage.includes('Razorpay credentials not configured')) {
+        toast.error('Payment system configuration error. Please contact support.');
+      } else if (errorMessage.includes('No token provided')) {
+        toast.error('Please login again to place your order.');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsProcessingOrder(false);
     }
+  };
+
+  const handlePaymentSuccess = async (paymentData: any) => {
+    try {
+      console.log('Payment successful, clearing cart...');
+      // Only clear cart after successful payment
+      const { cartService } = require('@/lib/api');
+      await cartService.clearCart();
+      
+      setShowPaymentModal(false);
+      toast.success('Payment completed successfully!');
+      router.push(`/checkout/success?orderId=${currentOrder.id}`);
+      
+    } catch (error) {
+      console.error('Error after payment success:', error);
+      // Still redirect to success page as payment was successful
+      setShowPaymentModal(false);
+      toast.success('Payment completed! Redirecting...');
+      router.push(`/checkout/success?orderId=${currentOrder.id}`);
+    }
+  };
+
+  const handlePaymentError = (error: string) => {
+    console.log('Payment failed/cancelled - preserving cart');
+    // IMPORTANT: Do NOT clear cart on payment failure/cancellation
+    setShowPaymentModal(false);
+    toast.error(error);
+    // Cart remains intact for user to try again
+  };
+
+  const handlePaymentCancel = () => {
+    console.log('Payment cancelled by user - preserving cart');
+    // IMPORTANT: Do NOT clear cart on payment cancellation
+    setShowPaymentModal(false);
+    setCurrentOrder(null);
+    // Cart remains intact for user to try again
   };
 
   // Safe calculation functions
@@ -314,16 +430,16 @@ export default function CheckoutPage() {
 
   if (isLoading) {
     return (
-      <AuthGuard>
+      <RealUserGuard>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-600"></div>
         </div>
-      </AuthGuard>
+      </RealUserGuard>
     );
   }
 
   return (
-    <AuthGuard>
+    <RealUserGuard>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -684,18 +800,18 @@ export default function CheckoutPage() {
                   {/* Place Order Button */}
                   <button
                     onClick={placeOrder}
-                    disabled={!selectedAddress || !selectedPaymentMethod || isProcessingOrder}
+                    disabled={!selectedAddress || isProcessingOrder}
                     className="w-full mt-6 bg-red-600 text-white py-4 px-6 rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 font-semibold text-lg shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessingOrder ? (
                       <>
                         <Loader2 className="h-6 w-6 animate-spin" />
-                        <span>Placing Order...</span>
+                        <span>Creating Order...</span>
                       </>
                     ) : (
                       <>
                         <CheckCircle className="h-6 w-6" />
-                        <span>Place Order ₹{total}</span>
+                        <span>Proceed to Payment ₹{total}</span>
                       </>
                     )}
                   </button>
@@ -705,6 +821,18 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </AuthGuard>
+
+      {/* Payment Modal */}
+      {showPaymentModal && currentOrder && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          order={currentOrder}
+          onSuccess={handlePaymentSuccess}
+          onError={handlePaymentError}
+          onCancel={handlePaymentCancel}
+        />
+      )}
+    </RealUserGuard>
   );
 } 

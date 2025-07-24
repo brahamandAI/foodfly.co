@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { authApi } from '@/lib/api';
+import GoogleLoginButton from './GoogleLoginButton';
 
 interface AuthPopupProps {
   onClose: () => void;
@@ -20,6 +21,23 @@ export default function AuthPopup({ onClose, onSuccess }: AuthPopupProps) {
     confirmPassword: ''
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    const isLoggedInStatus = localStorage.getItem('isLoggedIn') === 'true';
+    
+    const authenticated = !!((token && userData) || (isGuest && userData && isLoggedInStatus));
+    
+    if (authenticated) {
+      // User is already authenticated, close the popup and call success
+      onSuccess();
+      onClose();
+      return;
+    }
+  }, [onClose, onSuccess]);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -142,6 +160,11 @@ export default function AuthPopup({ onClose, onSuccess }: AuthPopupProps) {
     }
   };
 
+  const handleGoogleLoginSuccess = () => {
+    onSuccess();
+    onClose();
+  };
+
   const testApiConnection = async () => {
     try {
       // Test the health endpoint
@@ -183,8 +206,8 @@ export default function AuthPopup({ onClose, onSuccess }: AuthPopupProps) {
   const errorInputClasses = `w-full px-4 py-3 pl-10 text-gray-900 placeholder-gray-500 bg-white border border-red-500 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200`;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="modal-content-light rounded-2xl w-full max-w-md relative transform transition-all shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="modal-content-light rounded-2xl w-full max-w-md relative transform transition-all shadow-2xl mx-2 sm:mx-0 max-h-[95vh] overflow-y-auto">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -329,6 +352,21 @@ export default function AuthPopup({ onClose, onSuccess }: AuthPopupProps) {
                 isLogin ? 'Sign In' : 'Create Account'
               )}
             </button>
+
+            {/* Google Login */}
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <GoogleLoginButton
+              onSuccess={handleGoogleLoginSuccess}
+              text={isLogin ? "Sign in with Google" : "Sign up with Google"}
+            />
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">

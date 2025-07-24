@@ -32,6 +32,11 @@ const nextConfig = {
         hostname: '*.netlify.app',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+        pathname: '/v1/create-qr-code/**',
+      },
     ],
     // Enable image optimization
     minimumCacheTTL: 60,
@@ -92,8 +97,6 @@ const nextConfig = {
   
   // Experimental features
   experimental: {
-    // Enable app directory
-    appDir: true,
     // Optimize for server components
     serverComponentsExternalPackages: ['mongoose'],
   },

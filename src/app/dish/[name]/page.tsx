@@ -764,15 +764,15 @@ export default function DishPage() {
 
   const addToCart = async (item: DishOffering, quantity: number = 1) => {
     try {
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
       
       const basePrice = item.price;
       const sizePrice = 0; // Assuming no size customization
       const customizationPrice = item.customizations?.reduce((sum, custom) => sum + (custom.options.find(o => o.name === 'Regular')?.price || 0), 0) || 0;
       const totalPrice = basePrice + sizePrice + customizationPrice;
       
-      await cartService.addToCart(
+      await unifiedCartService.addToCart(
         item._id,
         item.name,
         item.description || '',

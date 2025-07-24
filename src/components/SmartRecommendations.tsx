@@ -211,10 +211,10 @@ export default function SmartRecommendations({
         return;
       }
 
-      // Use database cart API exclusively
-      const { cartService } = require('@/lib/api');
+      // Use unified cart service that works for both guests and authenticated users
+      const { unifiedCartService } = require('@/lib/api');
       
-      await cartService.addToCart(
+      await unifiedCartService.addToCart(
         item.id || item._id,
         item.name,
         item.description || '',

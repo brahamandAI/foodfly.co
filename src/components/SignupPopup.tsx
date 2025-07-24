@@ -1,11 +1,30 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
 import { UserPlus, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import GoogleLoginButton from "./GoogleLoginButton";
 
 const SignupPopup = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const router = useRouter();
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    if (isOpen) {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      const isGuest = localStorage.getItem('guest') === 'true';
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      
+      const authenticated = !!((token && userData) || (isGuest && userData && isLoggedIn));
+      
+      if (authenticated) {
+        // User is already authenticated, close the popup
+        onClose();
+        return;
+      }
+    }
+  }, [isOpen, onClose]);
 
   const handleGuestLogin = () => {
     // Create a guest user object
@@ -34,9 +53,10 @@ const SignupPopup = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
     router.push('/');
   };
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-    toast.loading('Connecting to Google...');
+  const handleGoogleLoginSuccess = () => {
+    // Close popup and redirect to home page
+    onClose();
+    router.push('/');
   };
 
   if (!isOpen) return null;
@@ -61,18 +81,22 @@ const SignupPopup = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
         <p className="text-gray-700 dark:text-gray-200 text-center mb-6">Sign up to unlock exclusive deals, track orders, and get personalized recommendations. Or continue as a guest!</p>
         {/* Buttons */}
         <div className="flex flex-col gap-4 w-full mt-2">
-          <button className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white py-2.5 rounded-lg font-semibold text-lg shadow hover:from-yellow-500 hover:to-yellow-600 transition-all duration-200">
+          <button 
+            onClick={() => {
+              onClose();
+              router.push('/login?mode=signup');
+            }}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white py-2.5 rounded-lg font-semibold text-lg shadow hover:from-yellow-500 hover:to-yellow-600 transition-all duration-200"
+          >
             <UserPlus className="w-5 h-5" /> Sign Up
           </button>
           
           {/* Google Login Button */}
-          <button 
-            onClick={handleGoogleLogin}
-            className="flex items-center justify-center gap-2 bg-white/90 text-gray-800 py-2.5 rounded-lg font-semibold text-lg shadow hover:bg-white transition-all duration-200 border border-gray-300/50"
-          >
-            <Image src="/google-icon.svg" alt="Google" width={20} height={20} />
-            Continue with Google
-          </button>
+          <GoogleLoginButton
+            onSuccess={handleGoogleLoginSuccess}
+            text="Continue with Google"
+            className="py-2.5 text-lg font-semibold shadow bg-white/90 hover:bg-white border-gray-300/50"
+          />
 
           <button 
             onClick={handleGuestLogin}

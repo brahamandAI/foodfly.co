@@ -3,7 +3,28 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
-import { TrendingUp, TrendingDown, Users, ShoppingBag, DollarSign, Star, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Users, 
+  ShoppingBag, 
+  DollarSign, 
+  Star, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  RefreshCw,
+  Activity,
+  BarChart3,
+  PieChart,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
+  Eye,
+  UserCheck,
+  Package,
+  Target
+} from 'lucide-react';
 
 interface DashboardStats {
   totalOrders: number;
@@ -22,131 +43,75 @@ interface DashboardStats {
   cancellationRate: number;
   orderGrowth: number;
   revenueGrowth: number;
+  averageOrderValue: number;
+  paymentMethods: {
+    cod: number;
+    online: number;
+    total: number;
+  };
+  ordersByStatus: Record<string, number>;
+  systemHealth: {
+    averageDeliveryTime: number;
+    customerSatisfaction: number;
+    platformUptime: number;
+    activeRestaurants: number;
+  };
+  insights: {
+    topPaymentMethod: string;
+    dailyAverageOrders: number;
+    peakOrderDay: string;
+    popularRestaurant: string;
+  };
 }
 
 interface RecentOrder {
   _id: string;
   orderNumber: string;
-  customerEmail: string;
-  deliveryAddress: {
-    name: string;
-    phone: string;
-  };
+  customerName: string;
   restaurant: {
-    _id: string;
     name: string;
   };
   totalAmount: number;
   status: string;
   createdAt: string;
-  placedAt: string;
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 0,
-    totalRevenue: 0,
-    totalUsers: 0,
-    totalRestaurants: 0,
-    pendingOrders: 0,
-    deliveredOrders: 0,
-    cancelledOrders: 0,
-    averageRating: 0,
-    todaysOrders: 0,
-    todaysRevenue: 0,
-    monthlyOrders: 0,
-    monthlyRevenue: 0,
-    completionRate: 0,
-    cancellationRate: 0,
-    orderGrowth: 0,
-    revenueGrowth: 0
-  });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
-    
-    // Auto-refresh every 30 seconds if enabled
-    const interval = setInterval(() => {
-      if (autoRefresh) {
-        fetchDashboardData(true); // Silent refresh
-      }
-    }, 30000);
+  }, []);
 
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const fetchDashboardData = async (silent = false) => {
-    if (!silent) {
-      setLoading(true);
-    }
-    setError('');
-
+  const fetchDashboardData = async () => {
     try {
-      const dashboardData = await adminApi.getDashboardStats();
-      setStats({
-        totalOrders: dashboardData.totalOrders || 0,
-        totalRevenue: dashboardData.totalRevenue || 0,
-        totalUsers: dashboardData.totalUsers || 0,
-        totalRestaurants: dashboardData.totalRestaurants || 0,
-        pendingOrders: dashboardData.pendingOrders || 0,
-        deliveredOrders: dashboardData.deliveredOrders || 0,
-        cancelledOrders: dashboardData.cancelledOrders || 0,
-        averageRating: dashboardData.averageRating || 0,
-        todaysOrders: dashboardData.todaysOrders || 0,
-        todaysRevenue: dashboardData.todaysRevenue || 0,
-        monthlyOrders: dashboardData.monthlyOrders || 0,
-        monthlyRevenue: dashboardData.monthlyRevenue || 0,
-        completionRate: dashboardData.completionRate || 0,
-        cancellationRate: dashboardData.cancellationRate || 0,
-        orderGrowth: dashboardData.orderGrowth || 0,
-        revenueGrowth: dashboardData.revenueGrowth || 0
-      });
+      setIsLoading(true);
+      setError(null);
+      
+      const [analyticsResponse, ordersResponse] = await Promise.all([
+        adminApi.getDashboardStats(),
+        adminApi.getAllOrders()
+      ]);
 
-      // Get recent orders - using the same API call for now
-      const ordersData = await adminApi.getAllOrders();
-      setRecentOrders(ordersData.slice(0, 5));
-    } catch (err: any) {
-      console.error('Error fetching dashboard data:', err);
-      setError(err.message || 'Failed to load dashboard data');
-      toast.error(err.message || 'Failed to load dashboard data');
+      setStats(analyticsResponse);
+      setRecentOrders(ordersResponse.slice(0, 10) || []);
+    } catch (error: any) {
+      console.error('Failed to fetch dashboard data:', error);
+      setError('Failed to load dashboard data');
+      toast.error('Failed to load dashboard data');
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
-      setLastUpdated(new Date());
+      setIsLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-
-
-
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-white text-[#232323] p-8">
-        <div className="text-center py-16">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
           <p className="text-gray-600 text-lg">Loading dashboard...</p>
         </div>
       </div>
@@ -155,14 +120,16 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white text-[#232323] p-8">
-        <div className="text-center py-16">
-          <p className="text-red-500 text-lg mb-4">{error}</p>
-          <button 
-            onClick={() => fetchDashboardData()}
-            className="px-6 py-3 bg-primary text-[#232323] rounded-lg hover:bg-yellow-600 font-semibold transition-colors"
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-red-100">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
           >
-            Retry
+            Try Again
           </button>
         </div>
       </div>
@@ -170,353 +137,344 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 text-gray-800">
-      {/* Header */}
-      <div className="bg-white shadow-lg border-b-4 border-orange-400">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="bg-orange-500 text-white p-3 rounded-xl">
-                <ShoppingBag className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-yellow-600 bg-clip-text text-transparent">
-                  Foodfly Admin Dashboard
-                </h1>
-                <p className="text-gray-600 text-sm">
-                  Real-time analytics and insights
-                  {lastUpdated && (
-                    <> • Last updated: {lastUpdated.toLocaleTimeString()}</>
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Auto-refresh toggle */}
-              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-2">
-                <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'text-green-600 animate-spin' : 'text-gray-400'}`} />
-                <label className="text-sm font-medium">Auto-refresh</label>
-                <button
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`w-10 h-6 rounded-full transition-colors duration-200 ${
-                    autoRefresh ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                    autoRefresh ? 'translate-x-5' : 'translate-x-1'
-                  }`} />
-                </button>
-              </div>
-              
-              {/* Manual refresh button */}
-              <button 
-                onClick={() => fetchDashboardData()}
-                className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>Refresh</span>
-              </button>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        
+        {/* Header */}
+        <div className="text-center py-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl mb-4">
+            <BarChart3 className="h-8 w-8 text-white" />
           </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            FoodFly Admin Dashboard
+          </h1>
+          <p className="text-xl text-gray-600">Comprehensive food delivery platform analytics</p>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-
-        {/* Overview Metrics */}
-        <div className="mb-12">
-          <div className="flex items-center space-x-2 mb-6">
-            <DollarSign className="h-6 w-6 text-orange-600" />
-            <h2 className="text-2xl font-bold text-gray-800">Business Overview</h2>
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Revenue */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-emerald-100 rounded-xl">
+                <DollarSign className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                stats?.revenueGrowth >= 0 
+                  ? 'bg-emerald-100 text-emerald-700' 
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {stats?.revenueGrowth >= 0 ? (
+                  <ArrowUpRight className="h-4 w-4" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4" />
+                )}
+                <span>{Math.abs(stats?.revenueGrowth || 0)}%</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">₹{(stats?.totalRevenue || 0).toLocaleString()}</p>
+              <p className="text-gray-600 mt-1">Total Revenue</p>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                label: 'Total Orders',
-                value: stats.totalOrders.toLocaleString(),
-                icon: ShoppingBag,
-                color: 'from-blue-500 to-blue-600',
-                bgColor: 'bg-blue-50',
-                change: '+12%'
-              },
-              {
-                label: 'Total Revenue',
-                value: formatCurrency(stats.totalRevenue),
-                icon: DollarSign,
-                color: 'from-green-500 to-green-600',
-                bgColor: 'bg-green-50',
-                change: '+8%'
-              },
-              {
-                label: 'Active Users',
-                value: stats.totalUsers.toLocaleString(),
-                icon: Users,
-                color: 'from-purple-500 to-purple-600',
-                bgColor: 'bg-purple-50',
-                change: '+15%'
-              },
-              {
-                label: 'Partner Restaurants',
-                value: stats.totalRestaurants.toLocaleString(),
-                icon: Star,
-                color: 'from-orange-500 to-orange-600',
-                bgColor: 'bg-orange-50',
-                change: '+5%'
-              }
-            ].map((metric) => {
-              const IconComponent = metric.icon;
-              return (
-                <div key={metric.label} className={`${metric.bgColor} backdrop-blur-sm border border-white/20 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${metric.color} shadow-lg`}>
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex items-center space-x-1 text-green-600 text-sm font-semibold">
-                      <TrendingUp className="h-3 w-3" />
-                      <span>{metric.change}</span>
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-800 mb-2">{metric.value}</div>
-                  <div className="text-gray-600 font-medium">{metric.label}</div>
-                </div>
-              );
-            })}
+
+          {/* Total Orders */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-blue-100 rounded-xl">
+                <ShoppingBag className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                stats?.orderGrowth >= 0 
+                  ? 'bg-emerald-100 text-emerald-700' 
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {stats?.orderGrowth >= 0 ? (
+                  <ArrowUpRight className="h-4 w-4" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4" />
+                )}
+                <span>{Math.abs(stats?.orderGrowth || 0)}%</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">{(stats?.totalOrders || 0).toLocaleString()}</p>
+              <p className="text-gray-600 mt-1">Total Orders</p>
+            </div>
+          </div>
+
+          {/* Total Users */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-purple-100 rounded-xl">
+                <Users className="h-6 w-6 text-purple-600" />
+              </div>
+              <Link href="/admin/users" className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                <Eye className="h-4 w-4" />
+                <span>View</span>
+              </Link>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">{(stats?.totalUsers || 0).toLocaleString()}</p>
+              <p className="text-gray-600 mt-1">Active Users</p>
+            </div>
+          </div>
+
+          {/* Average Rating */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-amber-100 rounded-xl">
+                <Star className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex items-center space-x-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-4 w-4 ${
+                      i < Math.floor(stats?.averageRating || 0)
+                        ? 'text-amber-400 fill-current'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">{stats?.averageRating || 0}</p>
+              <p className="text-gray-600 mt-1">Customer Rating</p>
+            </div>
           </div>
         </div>
 
         {/* Today's Performance */}
-        <div className="mb-12">
-          <div className="flex items-center space-x-2 mb-6">
-            <Clock className="h-6 w-6 text-orange-600" />
-            <h2 className="text-2xl font-bold text-gray-800">Today's Performance</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Calendar className="h-5 w-5 text-indigo-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Today's Performance</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Orders</span>
+                <span className="text-2xl font-bold text-gray-900">{stats?.todaysOrders || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Revenue</span>
+                <span className="text-2xl font-bold text-gray-900">₹{(stats?.todaysRevenue || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Avg. Order Value</span>
+                <span className="text-xl font-semibold text-gray-900">₹{stats?.averageOrderValue || 0}</span>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                label: "Today's Orders",
-                value: stats.todaysOrders.toLocaleString(),
-                icon: Clock,
-                color: 'from-indigo-500 to-indigo-600',
-                bgColor: 'bg-indigo-50'
-              },
-              {
-                label: "Today's Revenue",
-                value: formatCurrency(stats.todaysRevenue),
-                icon: DollarSign,
-                color: 'from-emerald-500 to-emerald-600',
-                bgColor: 'bg-emerald-50'
-              },
-              {
-                label: 'Monthly Orders',
-                value: stats.monthlyOrders.toLocaleString(),
-                icon: TrendingUp,
-                color: 'from-cyan-500 to-cyan-600',
-                bgColor: 'bg-cyan-50'
-              },
-              {
-                label: 'Monthly Revenue',
-                value: formatCurrency(stats.monthlyRevenue),
-                icon: DollarSign,
-                color: 'from-teal-500 to-teal-600',
-                bgColor: 'bg-teal-50'
-              }
-            ].map((metric) => {
-              const IconComponent = metric.icon;
-              return (
-                <div key={metric.label} className={`${metric.bgColor} backdrop-blur-sm border border-white/20 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${metric.color} shadow-lg`}>
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-800 mb-2">{metric.value}</div>
-                  <div className="text-gray-600 font-medium">{metric.label}</div>
-                </div>
-              );
-            })}
+
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Target className="h-5 w-5 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Performance Metrics</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Completion Rate</span>
+                <span className="text-2xl font-bold text-emerald-600">{stats?.completionRate || 0}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Cancellation Rate</span>
+                <span className="text-2xl font-bold text-red-500">{stats?.cancellationRate || 0}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Active Restaurants</span>
+                <span className="text-xl font-semibold text-gray-900">{stats?.totalRestaurants || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/20 shadow-xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Activity className="h-5 w-5 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Business Insights</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Peak Day</span>
+                <span className="text-lg font-semibold text-gray-900">{stats?.insights?.peakOrderDay || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Top Payment</span>
+                <span className="text-lg font-semibold text-gray-900 uppercase">{stats?.insights?.topPaymentMethod || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Daily Average</span>
+                <span className="text-lg font-semibold text-gray-900">{stats?.insights?.dailyAverageOrders || 0} orders</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Order Status & Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Order Status */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex items-center space-x-2 mb-6">
-              <ShoppingBag className="h-6 w-6 text-orange-600" />
-              <h3 className="text-xl font-bold text-gray-800">Order Status</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                {
-                  label: 'Pending Orders',
-                  value: stats.pendingOrders,
-                  icon: Clock,
-                  color: 'text-yellow-600',
-                  bgColor: 'bg-yellow-100'
-                },
-                {
-                  label: 'Completed',
-                  value: stats.deliveredOrders,
-                  icon: CheckCircle,
-                  color: 'text-green-600',
-                  bgColor: 'bg-green-100'
-                },
-                {
-                  label: 'Cancelled',
-                  value: stats.cancelledOrders,
-                  icon: XCircle,
-                  color: 'text-red-600',
-                  bgColor: 'bg-red-100'
-                },
-                {
-                  label: 'Avg Rating',
-                  value: stats.averageRating.toFixed(1),
-                  icon: Star,
-                  color: 'text-purple-600',
-                  bgColor: 'bg-purple-100'
-                }
-              ].map((metric) => {
-                const IconComponent = metric.icon;
-                return (
-                  <div key={metric.label} className={`${metric.bgColor} rounded-xl p-4 hover:shadow-md transition-shadow`}>
-                    <div className="flex items-center space-x-3">
-                      <IconComponent className={`h-8 w-8 ${metric.color}`} />
-                      <div>
-                        <div className="text-2xl font-bold text-gray-800">{metric.value}</div>
-                        <div className="text-sm text-gray-600">{metric.label}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Order Status Distribution */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <PieChart className="h-6 w-6 text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Order Status Overview</h2>
             </div>
           </div>
-
-          {/* Performance Insights */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex items-center space-x-2 mb-6">
-              <TrendingUp className="h-6 w-6 text-orange-600" />
-              <h3 className="text-xl font-bold text-gray-800">Performance Insights</h3>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+              <div className="p-3 bg-yellow-100 rounded-full w-fit mx-auto mb-3">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+              <p className="text-2xl font-bold text-yellow-700">{stats?.pendingOrders || 0}</p>
+              <p className="text-yellow-600 font-medium">Pending</p>
             </div>
-            <div className="space-y-4">
-              {[
-                {
-                  label: 'Order Completion Rate',
-                  value: stats.completionRate,
-                  suffix: '%',
-                  color: stats.completionRate >= 80 ? 'text-green-600' : 'text-yellow-600',
-                  bgColor: stats.completionRate >= 80 ? 'bg-green-100' : 'bg-yellow-100'
-                },
-                {
-                  label: 'Cancellation Rate',
-                  value: stats.cancellationRate,
-                  suffix: '%',
-                  color: stats.cancellationRate <= 10 ? 'text-green-600' : 'text-red-600',
-                  bgColor: stats.cancellationRate <= 10 ? 'bg-green-100' : 'bg-red-100'
-                },
-                {
-                  label: 'Monthly Growth',
-                  value: stats.orderGrowth,
-                  suffix: '%',
-                  color: stats.orderGrowth >= 0 ? 'text-green-600' : 'text-red-600',
-                  bgColor: stats.orderGrowth >= 0 ? 'bg-green-100' : 'bg-red-100'
-                },
-                {
-                  label: 'Revenue Growth',
-                  value: stats.revenueGrowth,
-                  suffix: '%',
-                  color: stats.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600',
-                  bgColor: stats.revenueGrowth >= 0 ? 'bg-green-100' : 'bg-red-100'
-                }
-              ].map((metric) => (
-                <div key={metric.label} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                  <span className="text-gray-700 font-medium">{metric.label}</span>
-                  <div className={`${metric.bgColor} ${metric.color} px-3 py-1 rounded-full font-bold text-sm`}>
-                    {metric.value}{metric.suffix}
-                  </div>
-                </div>
-              ))}
+            
+            <div className="text-center p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+              <div className="p-3 bg-emerald-100 rounded-full w-fit mx-auto mb-3">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-bold text-emerald-700">{stats?.deliveredOrders || 0}</p>
+              <p className="text-emerald-600 font-medium">Delivered</p>
+            </div>
+            
+            <div className="text-center p-4 bg-red-50 rounded-xl border border-red-200">
+              <div className="p-3 bg-red-100 rounded-full w-fit mx-auto mb-3">
+                <XCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <p className="text-2xl font-bold text-red-700">{stats?.cancelledOrders || 0}</p>
+              <p className="text-red-600 font-medium">Cancelled</p>
+            </div>
+            
+            <div className="text-center p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <div className="p-3 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
+                <Package className="h-6 w-6 text-indigo-600" />
+              </div>
+              <p className="text-2xl font-bold text-indigo-700">{stats?.totalRestaurants || 0}</p>
+              <p className="text-indigo-600 font-medium">Restaurants</p>
             </div>
           </div>
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <ShoppingBag className="h-6 w-6 text-orange-600" />
-              <h2 className="text-2xl font-bold text-gray-800">Recent Orders</h2>
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <ShoppingBag className="h-6 w-6 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Recent Orders</h2>
             </div>
             <Link 
               href="/admin/orders" 
-              className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 font-semibold transition-colors"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center space-x-2"
             >
-              <span>View All Orders</span>
-              <TrendingUp className="h-4 w-4" />
+              <span>View All</span>
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
           
-          {recentOrders.length === 0 ? (
-            <div className="text-center py-12">
-              <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">No recent orders found</p>
-              <p className="text-gray-400 text-sm">Orders will appear here once customers start placing them</p>
-            </div>
-          ) : (
-            <div className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Order Details</th>
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Customer</th>
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Restaurant</th>
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Amount</th>
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Status</th>
-                      <th className="py-4 px-4 text-left font-semibold text-gray-700">Date</th>
+          <div className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Order ID</th>
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Customer</th>
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Restaurant</th>
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Amount</th>
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Status</th>
+                    <th className="text-left py-4 px-4 text-gray-600 font-medium">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.slice(0, 8).map((order) => (
+                    <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-4">
+                        <span className="font-mono text-sm bg-gray-200 text-gray-900 px-3 py-1 rounded-md font-medium border">
+                          {order.orderNumber}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 font-medium text-gray-900">{order.customerName}</td>
+                      <td className="py-4 px-4 text-gray-600">{order.restaurant?.name || 'N/A'}</td>
+                      <td className="py-4 px-4 font-semibold">₹{order.totalAmount.toLocaleString()}</td>
+                      <td className="py-4 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          order.status === 'delivered' 
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : order.status === 'cancelled'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-gray-600 text-sm">
+                        {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {recentOrders.map(order => (
-                      <tr key={order._id} className="hover:bg-orange-50 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="font-bold text-gray-900">#{order.orderNumber}</div>
-                          <div className="text-sm text-gray-500">{order.customerEmail}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="font-medium text-gray-900">{order.deliveryAddress.name}</div>
-                          <div className="text-sm text-gray-500">{order.deliveryAddress.phone}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="font-medium text-gray-900">{order.restaurant.name}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="font-bold text-lg text-green-600">{formatCurrency(order.totalAmount)}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${
-                            order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            order.status === 'preparing' ? 'bg-orange-100 text-orange-800' :
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {order.status.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="text-sm text-gray-900">{formatDate(order.placedAt || order.createdAt)}</div>
-                          <div className="text-xs text-gray-500">{new Date(order.placedAt || order.createdAt).toLocaleTimeString()}</div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <UserCheck className="h-6 w-6 text-purple-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Quick Actions</h2>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <Link href="/admin/orders" className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors group">
+              <ShoppingBag className="h-8 w-8 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-blue-700">Orders</span>
+            </Link>
+            
+            <Link href="/admin/users" className="flex flex-col items-center p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors group">
+              <Users className="h-8 w-8 text-purple-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-purple-700">Users</span>
+            </Link>
+            
+            <Link href="/admin/restaurants" className="flex flex-col items-center p-4 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors group">
+              <Package className="h-8 w-8 text-emerald-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-emerald-700">Restaurants</span>
+            </Link>
+            
+            <Link href="/admin/analytics" className="flex flex-col items-center p-4 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors group">
+              <BarChart3 className="h-8 w-8 text-indigo-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-indigo-700">Analytics</span>
+            </Link>
+            
+            <button onClick={fetchDashboardData} className="flex flex-col items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group">
+              <RefreshCw className="h-8 w-8 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-gray-700">Refresh</span>
+            </button>
+            
+            <Link href="/admin/support" className="flex flex-col items-center p-4 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors group">
+              <Activity className="h-8 w-8 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-amber-700">Support</span>
+            </Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );

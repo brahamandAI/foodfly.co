@@ -15,8 +15,24 @@ export async function GET(request: NextRequest) {
     
     const user = verifyToken(request);
     
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const includeCancelled = searchParams.get('includeCancelled') === 'true';
+    const status = searchParams.get('status');
+    
+    // Build query filter
+    let queryFilter: any = { customerId: user._id };
+    
+    // Filter by specific status if provided
+    if (status && status !== 'all') {
+      queryFilter.status = status;
+    } else if (!includeCancelled) {
+      // By default, exclude cancelled orders unless specifically requested
+      queryFilter.status = { $ne: 'cancelled' };
+    }
+
     // Get user's orders using customerId field
-    const orders = await Order.find({ customerId: user._id })
+    const orders = await Order.find(queryFilter)
       .sort({ createdAt: -1 })
       .limit(50);
 

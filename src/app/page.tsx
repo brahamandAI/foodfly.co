@@ -76,7 +76,7 @@ export default function HomePage() {
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [cartItemCount, setCartItemCount] = useState(0);
-  const [showSignupPopup, setShowSignupPopup] = useState(true);
+  const [showSignupPopup, setShowSignupPopup] = useState(false);
 
   // Mock data for testing
   const mockRestaurants: Restaurant[] = [
