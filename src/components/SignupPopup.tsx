@@ -100,7 +100,7 @@ const SignupPopup = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
 
           <button 
             onClick={handleGuestLogin}
-            className="flex items-center justify-center gap-2 bg-white/70 dark:bg-gray-800/70 border border-gray-300/50 dark:border-gray-600/50 text-gray-800 dark:text-white py-2.5 rounded-lg font-semibold text-lg shadow hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
+            className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 border-2 border-gray-600 text-white py-2.5 rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
           >
             <User className="w-5 h-5" /> Continue as Guest
           </button>

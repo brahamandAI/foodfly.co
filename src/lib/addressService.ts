@@ -1,5 +1,6 @@
 // Central Address Management Service
 // Ensures consistency between location selector, checkout, and user addresses
+// Now uses database for authenticated users, localStorage for guests
 
 export interface Address {
   _id?: string;
@@ -35,20 +36,103 @@ class AddressService {
   private readonly STORAGE_KEY = 'userLocations';
   private readonly DEFAULT_LOCATION_KEY = 'defaultLocation';
 
+  // Check if user is authenticated (not guest)
+  private isAuthenticated(): boolean {
+    const token = localStorage.getItem('token');
+    const isGuest = localStorage.getItem('guest') === 'true';
+    return !!(token && !isGuest);
+  }
+
+  // Get current user ID
+  private getCurrentUserId(): string | null {
+    try {
+      const user = localStorage.getItem('user');
+      return user ? JSON.parse(user).id || JSON.parse(user)._id : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Get all user addresses
-  getUserAddresses(): Address[] {
+  async getUserAddresses(): Promise<Address[]> {
+    if (this.isAuthenticated()) {
+      // Use database for authenticated users
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/users/addresses', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return data.addresses || [];
+        }
+      } catch (error) {
+        console.error('Error fetching addresses from database:', error);
+      }
+    }
+
+    // Fallback to localStorage for guests or on error
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('Error loading addresses:', error);
+      console.error('Error loading addresses from localStorage:', error);
       return [];
     }
   }
 
   // Add new address
-  addAddress(address: Omit<Address, '_id'>): Address {
-    const addresses = this.getUserAddresses();
+  async addAddress(address: Omit<Address, '_id'>): Promise<Address> {
+    if (this.isAuthenticated()) {
+      // Use database for authenticated users
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/users/addresses', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            label: address.type === 'home' ? 'Home' : address.type === 'work' ? 'Work' : 'Other',
+            name: address.name,
+            phone: address.phone || '',
+            street: address.street || '',
+            landmark: address.landmark || '',
+            city: address.city,
+            state: address.state || '',
+            pincode: address.pincode || '',
+            isDefault: address.isDefault
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return {
+            _id: data.address._id,
+            type: data.address.label.toLowerCase() as any,
+            name: data.address.name,
+            phone: data.address.phone,
+            street: data.address.street,
+            landmark: data.address.landmark,
+            city: data.address.city,
+            state: data.address.state,
+            pincode: data.address.pincode,
+            fullAddress: address.fullAddress,
+            coordinates: address.coordinates,
+            isDefault: data.address.isDefault
+          };
+        }
+      } catch (error) {
+        console.error('Error adding address to database:', error);
+      }
+    }
+
+    // Fallback to localStorage for guests or on error
+    const addresses = await this.getUserAddresses();
     
     // If this is the first address, make it default
     if (addresses.length === 0) {
@@ -77,8 +161,41 @@ class AddressService {
   }
 
   // Update existing address
-  updateAddress(addressId: string, updates: Partial<Address>): boolean {
-    const addresses = this.getUserAddresses();
+  async updateAddress(addressId: string, updates: Partial<Address>): Promise<boolean> {
+    if (this.isAuthenticated()) {
+      // Use database for authenticated users
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/users/addresses', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            addressId,
+            label: updates.type === 'home' ? 'Home' : updates.type === 'work' ? 'Work' : 'Other',
+            name: updates.name,
+            phone: updates.phone,
+            street: updates.street,
+            landmark: updates.landmark,
+            city: updates.city,
+            state: updates.state,
+            pincode: updates.pincode,
+            isDefault: updates.isDefault
+          }),
+        });
+
+        if (response.ok) {
+          return true;
+        }
+      } catch (error) {
+        console.error('Error updating address in database:', error);
+      }
+    }
+
+    // Fallback to localStorage for guests or on error
+    const addresses = await this.getUserAddresses();
     const index = addresses.findIndex(addr => addr._id === addressId);
     
     if (index === -1) return false;
@@ -100,8 +217,28 @@ class AddressService {
   }
 
   // Delete address
-  deleteAddress(addressId: string): boolean {
-    const addresses = this.getUserAddresses();
+  async deleteAddress(addressId: string): Promise<boolean> {
+    if (this.isAuthenticated()) {
+      // Use database for authenticated users
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/users/addresses?addressId=${addressId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          return true;
+        }
+      } catch (error) {
+        console.error('Error deleting address from database:', error);
+      }
+    }
+
+    // Fallback to localStorage for guests or on error
+    const addresses = await this.getUserAddresses();
     const index = addresses.findIndex(addr => addr._id === addressId);
     
     if (index === -1) return false;
@@ -126,28 +263,13 @@ class AddressService {
   }
 
   // Set default address
-  setDefaultAddress(addressId: string): boolean {
-    const addresses = this.getUserAddresses();
-    const targetIndex = addresses.findIndex(addr => addr._id === addressId);
-    
-    if (targetIndex === -1) return false;
-    
-    // Remove default from all addresses
-    addresses.forEach(addr => addr.isDefault = false);
-    
-    // Set new default
-    addresses[targetIndex].isDefault = true;
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(addresses));
-    
-    // Update default location
-    this.setDefaultLocation(addresses[targetIndex]);
-    
-    return true;
+  async setDefaultAddress(addressId: string): Promise<boolean> {
+    return this.updateAddress(addressId, { isDefault: true });
   }
 
   // Get default address
-  getDefaultAddress(): Address | null {
-    const addresses = this.getUserAddresses();
+  async getDefaultAddress(): Promise<Address | null> {
+    const addresses = await this.getUserAddresses();
     return addresses.find(addr => addr.isDefault) || addresses[0] || null;
   }
 
@@ -204,8 +326,8 @@ class AddressService {
   }
 
   // Sync addresses with checkout addresses
-  syncWithCheckout(): void {
-    const addresses = this.getUserAddresses();
+  async syncWithCheckout(): Promise<void> {
+    const addresses = await this.getUserAddresses();
     const checkoutAddresses = addresses.map(addr => ({
       _id: addr._id,
       type: addr.type,
@@ -228,6 +350,46 @@ class AddressService {
     localStorage.removeItem(this.DEFAULT_LOCATION_KEY);
     localStorage.removeItem('selectedLocation');
     localStorage.removeItem('checkoutAddresses');
+  }
+
+  // Migrate guest addresses to database on login
+  async migrateGuestAddresses(): Promise<void> {
+    if (!this.isAuthenticated()) {
+      return;
+    }
+
+    try {
+      const guestAddresses = localStorage.getItem(this.STORAGE_KEY);
+      if (guestAddresses) {
+        const addresses = JSON.parse(guestAddresses);
+        
+        for (const address of addresses) {
+          try {
+            await this.addAddress({
+              type: address.type,
+              name: address.name,
+              phone: address.phone,
+              street: address.street,
+              landmark: address.landmark,
+              city: address.city,
+              state: address.state,
+              pincode: address.pincode,
+              fullAddress: address.fullAddress,
+              coordinates: address.coordinates,
+              isDefault: address.isDefault
+            });
+          } catch (error) {
+            console.error('Error migrating address:', error);
+          }
+        }
+        
+        // Clear guest addresses after migration
+        localStorage.removeItem(this.STORAGE_KEY);
+        console.log('Successfully migrated guest addresses to database');
+      }
+    } catch (error) {
+      console.error('Error migrating guest addresses:', error);
+    }
   }
 }
 

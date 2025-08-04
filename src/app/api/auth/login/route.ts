@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/backend/database';
 import User from '@/lib/backend/models/user.model';
 import Notification from '@/lib/backend/models/notification.model';
-import { generateToken } from '@/lib/backend/utils/jwt';
+import { SessionManager } from '@/lib/backend/utils/sessionManager';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,8 +41,26 @@ export async function POST(request: NextRequest) {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate JWT token
-    const token = generateToken(user._id.toString(), user.role);
+    // Create database-persistent session (prevent chef and delivery users from using this endpoint)
+    if (user.role === 'chef') {
+      return NextResponse.json(
+        { error: 'Chef users must use the chef login endpoint at /chef/login' },
+        { status: 403 }
+      );
+    }
+
+    if (user.role === 'delivery') {
+      return NextResponse.json(
+        { error: 'Delivery agents must use the delivery login endpoint at /delivery/login' },
+        { status: 403 }
+      );
+    }
+
+    const sessionData = await SessionManager.createSession(
+      user._id.toString(),
+      user.role as 'customer' | 'delivery' | 'admin',
+      request.headers
+    );
 
     // Create login notification (only for first login of the day)
     const today = new Date();
@@ -87,11 +105,24 @@ export async function POST(request: NextRequest) {
       createdAt: user.createdAt
     };
 
-    return NextResponse.json({
+    // Create response and set cookie for middleware
+    const response = NextResponse.json({
       message: 'Login successful',
-      token,
-      user: userResponse
+      user: userResponse,
+      token: sessionData.token,
+      sessionId: sessionData.sessionId
     });
+
+    // Set HTTP-only cookie for middleware
+    response.cookies.set('token', sessionData.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
+    });
+
+    return response;
 
   } catch (error: any) {
     console.error('Login error:', error);

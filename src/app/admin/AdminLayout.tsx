@@ -8,6 +8,8 @@ const navLinks = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/deals', label: 'Deals' },
   { href: '/admin/orders', label: 'Orders' },
+  { href: '/admin/delivery-partners', label: 'Delivery Partners' },
+  { href: '/admin/order-assignments', label: 'Order Assignments' },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/restaurants', label: 'Restaurants' },
   { href: '/admin/support', label: 'Support' },

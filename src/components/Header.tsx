@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, ShoppingCart, User, Menu, X, MapPin, Heart, Clock, LogOut, LogIn, ChevronDown, Mic } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, MapPin, Heart, Clock, LogOut, LogIn, ChevronDown, Mic, ChefHat } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import LocationSelector from './LocationSelector';
 import VoiceAssistant from './VoiceAssistant';
@@ -298,6 +298,15 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="flex items-center space-x-6">
+            {/* Chef Services */}
+            <Link 
+              href="/chef-services" 
+              className="hidden md:flex items-center space-x-2 text-gray-300 hover:text-orange-500 transition-colors duration-200 group"
+            >
+              <ChefHat className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Chef Services</span>
+            </Link>
+
             {/* Voice Assistant */}
             <button
               onClick={() => setShowVoiceAssistant(true)}
@@ -425,6 +434,10 @@ export default function Header() {
 
               {/* Mobile Navigation */}
               <div className="space-y-2">
+                <Link href="/chef-services" className="block text-gray-300 hover:text-orange-500 py-2">
+                  <ChefHat className="h-4 w-4 inline mr-2" />
+                  Chef Services
+                </Link>
                 {isLoggedIn ? (
                   <>
                     <Link href="/profile" className="block text-gray-300 hover:text-white py-2">Profile</Link>

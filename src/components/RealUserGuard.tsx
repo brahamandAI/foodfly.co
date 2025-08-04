@@ -7,10 +7,12 @@ import { Loader2, UserX, LogIn } from 'lucide-react';
 interface RealUserGuardProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
+  requiredRoles?: string[];
 }
 
-export default function RealUserGuard({ children, fallback }: RealUserGuardProps) {
+export default function RealUserGuard({ children, fallback, requiredRoles }: RealUserGuardProps) {
   const [isRealUser, setIsRealUser] = useState<boolean | null>(null);
+  const [hasRequiredRole, setHasRequiredRole] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
@@ -31,12 +33,23 @@ export default function RealUserGuard({ children, fallback }: RealUserGuardProps
           // Additional check: if user object has isGuest flag, respect it
           if (parsedUser.isGuest === true) {
             setIsRealUser(false);
+            setHasRequiredRole(false);
             setIsLoading(false);
             return;
+          }
+
+          // Check required roles if specified
+          if (requiredRoles && requiredRoles.length > 0) {
+            const userRole = parsedUser.role;
+            const hasRole = requiredRoles.includes(userRole);
+            setHasRequiredRole(hasRole);
+          } else {
+            setHasRequiredRole(true); // No specific role required
           }
         } catch (error) {
           console.error('Error parsing user data:', error);
           setIsRealUser(false);
+          setHasRequiredRole(false);
           setIsLoading(false);
           return;
         }
@@ -88,28 +101,84 @@ export default function RealUserGuard({ children, fallback }: RealUserGuardProps
     );
   }
 
-  if (!isRealUser) {
+  if (!isRealUser || hasRequiredRole === false) {
+    // Determine the appropriate login URL based on required roles
+    const getLoginUrl = () => {
+      if (requiredRoles?.includes('delivery')) {
+        return '/login?role=delivery';
+      } else if (requiredRoles?.includes('admin')) {
+        return '/admin/login';
+      }
+      return '/login';
+    };
+
+    const getRegisterUrl = () => {
+      if (requiredRoles?.includes('delivery')) {
+        return '/register-delivery';
+      }
+      return '/register';
+    };
+
+    const getMessage = () => {
+      if (!isRealUser) {
+        if (user?.isGuest) {
+          return 'Hi Guest! To access delivery features, please create a delivery partner account or sign in.';
+        }
+        return 'You need to be signed in to access this feature.';
+      } else if (hasRequiredRole === false) {
+        if (requiredRoles?.includes('delivery')) {
+          return 'This page is for delivery partners only. Please sign in with a delivery account or register as a delivery partner.';
+        } else if (requiredRoles?.includes('admin')) {
+          return 'This page is for administrators only.';
+        }
+        return 'You do not have permission to access this page.';
+      }
+      return 'Access denied.';
+    };
+
+    const getTitle = () => {
+      if (!isRealUser) {
+        return user?.isGuest ? 'Sign Up Required' : 'Please Sign In';
+      } else if (hasRequiredRole === false) {
+        if (requiredRoles?.includes('delivery')) {
+          return 'Delivery Partner Access Required';
+        } else if (requiredRoles?.includes('admin')) {
+          return 'Admin Access Required';
+        }
+        return 'Access Denied';
+      }
+      return 'Access Required';
+    };
+
     return fallback || (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md mx-auto p-8">
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <UserX className="h-16 w-16 text-orange-500 mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {user?.isGuest ? 'Sign Up Required' : 'Please Sign In'}
+              {getTitle()}
             </h2>
             <p className="text-gray-600 mb-6">
-              {user?.isGuest 
-                ? 'Hi Guest! To place orders and access all features, please create a FoodFly account or sign in.' 
-                : 'You need to be signed in to access this feature.'}
+              {getMessage()}
             </p>
             <div className="space-y-3">
               <button
-                onClick={() => router.push('/login')}
+                onClick={() => router.push(getLoginUrl())}
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-xl font-semibold transition-colors flex items-center justify-center space-x-2"
               >
                 <LogIn className="h-5 w-5" />
-                <span>Sign In / Sign Up</span>
+                <span>
+                  {requiredRoles?.includes('delivery') ? 'Delivery Partner Sign In' : 'Sign In'}
+                </span>
               </button>
+              {(!isRealUser && requiredRoles?.includes('delivery')) && (
+                <button
+                  onClick={() => router.push(getRegisterUrl())}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-3 px-6 rounded-xl font-semibold transition-colors"
+                >
+                  Register as Delivery Partner
+                </button>
+              )}
               <button
                 onClick={() => router.push('/')}
                 className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-semibold transition-colors"

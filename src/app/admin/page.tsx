@@ -62,6 +62,16 @@ interface DashboardStats {
     peakOrderDay: string;
     popularRestaurant: string;
   };
+  // Delivery Partner Stats
+  totalDeliveryPartners: number;
+  activeDeliveryPartners: number;
+  avgDeliveryTime: number;
+  deliveryPartnerRating: number;
+  // Chef Stats
+  totalChefs: number;
+  activeChefs: number;
+  avgChefRating: number;
+  totalChefBookings: number;
 }
 
 interface RecentOrder {
@@ -433,6 +443,111 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Delivery Partners & Chefs Management */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Delivery Partners Section */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="h-6 w-6 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Delivery Partners</h2>
+              </div>
+              <Link href="/admin/delivery-partners" className="text-blue-600 hover:text-blue-800 font-medium text-sm">
+                View All →
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-blue-700">
+                  {stats?.totalDeliveryPartners || 0}
+                </div>
+                <div className="text-sm text-blue-600">Total Partners</div>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-green-700">
+                  {stats?.activeDeliveryPartners || 0}
+                </div>
+                <div className="text-sm text-green-600">Online Now</div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-purple-700">
+                  {stats?.deliveryPartnerRating || 0}⭐
+                </div>
+                <div className="text-sm text-purple-600">Avg Rating</div>
+              </div>
+              <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-orange-700">
+                  {stats?.avgDeliveryTime || 0}m
+                </div>
+                <div className="text-sm text-orange-600">Avg Delivery</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Link href="/admin/delivery-partners" className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-center font-medium transition-colors">
+                Manage Partners
+              </Link>
+              <Link href="/admin/delivery-assignments" className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-center font-medium transition-colors">
+                Live Tracking
+              </Link>
+            </div>
+          </div>
+
+          {/* Chefs Section */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Star className="h-6 w-6 text-orange-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Chef Services</h2>
+              </div>
+              <Link href="/admin/chefs" className="text-orange-600 hover:text-orange-800 font-medium text-sm">
+                View All →
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-orange-700">
+                  {stats?.totalChefs || 0}
+                </div>
+                <div className="text-sm text-orange-600">Total Chefs</div>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-green-700">
+                  {stats?.activeChefs || 0}
+                </div>
+                <div className="text-sm text-green-600">Available</div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-purple-700">
+                  {stats?.avgChefRating || 0}⭐
+                </div>
+                <div className="text-sm text-purple-600">Avg Rating</div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
+                <div className="text-2xl font-bold text-blue-700">
+                  {stats?.totalChefBookings || 0}
+                </div>
+                <div className="text-sm text-blue-600">Total Bookings</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Link href="/admin/chefs" className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg text-center font-medium transition-colors">
+                Manage Chefs
+              </Link>
+              <Link href="/admin/chef-bookings" className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-center font-medium transition-colors">
+                View Bookings
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* Quick Actions */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-xl">
           <div className="flex items-center space-x-3 mb-6">
@@ -442,7 +557,7 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold text-gray-900">Quick Actions</h2>
           </div>
           
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-8 gap-4">
             <Link href="/admin/orders" className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors group">
               <ShoppingBag className="h-8 w-8 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-blue-700">Orders</span>
@@ -467,6 +582,16 @@ export default function AdminDashboard() {
               <RefreshCw className="h-8 w-8 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium text-gray-700">Refresh</span>
             </button>
+            
+            <Link href="/admin/delivery-partners" className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors group">
+              <Package className="h-8 w-8 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-blue-700">Delivery</span>
+            </Link>
+            
+            <Link href="/admin/chefs" className="flex flex-col items-center p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors group">
+              <Star className="h-8 w-8 text-orange-600 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-orange-700">Chefs</span>
+            </Link>
             
             <Link href="/admin/support" className="flex flex-col items-center p-4 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors group">
               <Activity className="h-8 w-8 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />

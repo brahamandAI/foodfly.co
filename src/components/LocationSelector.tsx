@@ -162,7 +162,20 @@ export default function LocationSelector({ isOpen, onClose, onLocationSelect }: 
 
   const reverseGeocode = async (lat: number, lng: number): Promise<Partial<Address>> => {
     try {
-      // Using a simple reverse geocoding service (you can replace with Google Maps API)
+      // Try Google Maps geocoding first
+      const { googleMapsService } = await import('@/lib/googleMapsService');
+      
+      if (googleMapsService.isConfigured()) {
+        const result = await googleMapsService.reverseGeocode(lat, lng);
+        return {
+          street: result.components.street || '',
+          city: result.components.city || '',
+          state: result.components.state || '',
+          pincode: result.components.pincode || ''
+        };
+      }
+      
+      // Fallback to OpenCage if Google Maps not configured
       const response = await fetch(
         `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=YOUR_OPENCAGE_API_KEY`
       );

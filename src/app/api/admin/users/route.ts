@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Get order statistics for each user
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
-        if (user.role === 'user') {
+        if (user.role === 'customer' || user.role === 'user') {
           // Get order stats for customers only
           const [totalOrders, totalSpent] = await Promise.all([
             Order.countDocuments({ customerId: user._id }),

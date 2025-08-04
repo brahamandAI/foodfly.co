@@ -13,6 +13,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
   const mode = searchParams.get('mode'); // Check for signup mode
+  const role = searchParams.get('role'); // Check for delivery role
   
   const [isLogin, setIsLogin] = useState(mode !== 'signup'); // Default to signup if mode=signup
   const [isLoading, setIsLoading] = useState(false);
@@ -107,13 +108,18 @@ function LoginPageContent() {
             console.error('Error loading user data:', error);
           }
           
-          // Migrate guest cart and load user cart from database
-          const { unifiedCartService } = await import('@/lib/api');
-          await unifiedCartService.migrateGuestCartOnLogin();
-          await unifiedCartService.loadUserCartFromDatabase();
+                     // Migrate guest cart and load user cart from database
+           const { unifiedCartService } = await import('@/lib/api');
+           await unifiedCartService.migrateGuestCartOnLogin();
+           await unifiedCartService.loadUserCartFromDatabase();
+           
+           // Migrate guest addresses to database
+           const { addressService } = await import('@/lib/addressService');
+           await addressService.migrateGuestAddresses();
           
-          // Redirect to the intended page
-          router.push(decodeURIComponent(redirectUrl));
+          // Redirect to the intended page or delivery dashboard for delivery users
+          const finalRedirect = role === 'delivery' && redirectUrl === '/' ? '/delivery' : decodeURIComponent(redirectUrl);
+          router.push(finalRedirect);
         }
       } else {
         // Register
@@ -143,18 +149,23 @@ function LoginPageContent() {
             detail: { isLoggedIn: true, user: response.user }
           }));
 
-          // Load user-specific data and migrate any existing data
-          try {
-            const { userStorage } = await import('@/lib/api');
-            userStorage.loadUserData(response.user.id || response.user._id);
-          } catch (error) {
-            console.error('Error loading user data:', error);
-          }
+                     // Load user-specific data and migrate any existing data
+           try {
+             const { userStorage } = await import('@/lib/api');
+             userStorage.loadUserData(response.user.id || response.user._id);
+           } catch (error) {
+             console.error('Error loading user data:', error);
+           }
 
-          toast.success('Account created successfully!');
+           // Migrate guest addresses to database
+           const { addressService } = await import('@/lib/addressService');
+           await addressService.migrateGuestAddresses();
+
+           toast.success('Account created successfully!');
           
-          // Redirect to the intended page
-          router.push(decodeURIComponent(redirectUrl));
+          // Redirect to the intended page or delivery dashboard for delivery users
+          const finalRedirect = role === 'delivery' && redirectUrl === '/' ? '/delivery' : decodeURIComponent(redirectUrl);
+          router.push(finalRedirect);
         }
       }
     } catch (error: any) {
@@ -247,13 +258,13 @@ function LoginPageContent() {
       </div>
 
       {/* Auth Container */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-8 flex flex-col items-center animate-fade-in backdrop-blur-xl bg-white/60 dark:bg-gray-900/60">
+      <div className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl border border-gray-700/50 p-8 flex flex-col items-center animate-fade-in backdrop-blur-xl bg-gray-900/90">
         {/* Close/Back button */}
-        <button
+                  <button
           onClick={() => router.push('/')}
-          className="absolute right-4 top-4 p-2 hover:bg-red-600/20 rounded-full transition-colors duration-200"
+          className="absolute right-4 top-4 p-2 bg-gray-800 hover:bg-red-900 rounded-full transition-colors duration-200 shadow-md"
         >
-          <X className="h-5 w-5 text-gray-400" />
+          <X className="h-5 w-5 text-gray-300 hover:text-red-400" />
         </button>
 
         <div className="w-full">
@@ -264,13 +275,19 @@ function LoginPageContent() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white drop-shadow mb-2">
-              {isLogin ? 'Sign In' : 'Create Account'}
+            <h2 className="text-3xl font-extrabold text-white mb-2">
+              {role === 'delivery' 
+                ? (isLogin ? 'Delivery Partner Sign In' : 'Join Delivery Team')
+                : (isLogin ? 'Sign In' : 'Create Account')
+              }
             </h2>
-            <p className="mt-2 text-gray-700 dark:text-gray-200">
-              {isLogin 
-                ? 'Sign in to access your account' 
-                : 'Join us and start ordering delicious food'}
+            <p className="mt-2 text-gray-300 font-medium">
+              {role === 'delivery' 
+                ? (isLogin ? 'Sign in to your delivery partner account' : 'Register as a delivery partner')
+                : (isLogin 
+                  ? 'Sign in to access your account' 
+                  : 'Join us and start ordering delicious food')
+              }
             </p>
           </div>
 
@@ -278,7 +295,7 @@ function LoginPageContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label className="block text-sm font-bold text-white mb-1">
                   Full Name
                 </label>
                 <div className="relative">
@@ -290,20 +307,22 @@ function LoginPageContent() {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.name ? 'border-red-500' : ''}`}
+                    className={`w-full px-4 py-3 pl-10 text-white placeholder-gray-400 bg-gray-800/70 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-gray-800 transition-all duration-200 shadow-sm ${errors.name ? 'border-red-500 bg-red-900/30' : 'hover:border-gray-500'}`}
                     placeholder="John Doe"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.name && (
-                  <p className="mt-1 text-sm text-red-400">{errors.name}</p>
+                  <div className="mt-2 bg-red-900/30 border border-red-500 rounded-lg p-2">
+                    <p className="text-sm text-red-400 font-semibold">{errors.name}</p>
+                  </div>
                 )}
               </div>
             )}
 
             {/* Email field */}
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+              <label className="block text-sm font-bold text-white mb-1">
                 Email Address
               </label>
               <div className="relative">
@@ -315,19 +334,21 @@ function LoginPageContent() {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.email ? 'border-red-500' : ''}`}
+                  className={`w-full px-4 py-3 pl-10 text-white placeholder-gray-400 bg-gray-800/70 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-gray-800 transition-all duration-200 shadow-sm ${errors.email ? 'border-red-500 bg-red-900/30' : 'hover:border-gray-500'}`}
                   placeholder="you@example.com"
                   disabled={isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                <div className="mt-2 bg-red-900/30 border border-red-500 rounded-lg p-2">
+                  <p className="text-sm text-red-400 font-semibold">{errors.email}</p>
+                </div>
               )}
             </div>
 
             {/* Password field */}
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+              <label className="block text-sm font-bold text-white mb-1">
                 Password
               </label>
               <div className="relative">
@@ -339,20 +360,22 @@ function LoginPageContent() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.password ? 'border-red-500' : ''}`}
+                  className={`w-full px-4 py-3 pl-10 text-white placeholder-gray-400 bg-gray-800/70 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-gray-800 transition-all duration-200 shadow-sm ${errors.password ? 'border-red-500 bg-red-900/30' : 'hover:border-gray-500'}`}
                   placeholder="••••••••"
                   disabled={isLoading}
                 />
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                <div className="mt-2 bg-red-900/30 border border-red-500 rounded-lg p-2">
+                  <p className="text-sm text-red-400 font-semibold">{errors.password}</p>
+                </div>
               )}
             </div>
 
             {/* Confirm Password field (for registration) */}
             {!isLogin && (
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label className="block text-sm font-bold text-white mb-1">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -364,75 +387,109 @@ function LoginPageContent() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 pl-10 text-gray-900 dark:text-white placeholder-gray-500 bg-white/70 dark:bg-black/40 border border-gray-300/50 dark:border-gray-700/50 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                    className={`w-full px-4 py-3 pl-10 text-white placeholder-gray-400 bg-gray-800/70 border-2 border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-gray-800 transition-all duration-200 shadow-sm ${errors.confirmPassword ? 'border-red-500 bg-red-900/30' : 'hover:border-gray-500'}`}
                     placeholder="••••••••"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-400">{errors.confirmPassword}</p>
+                  <div className="mt-2 bg-red-900/30 border border-red-500 rounded-lg p-2">
+                    <p className="text-sm text-red-400 font-semibold">{errors.confirmPassword}</p>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-white py-3 rounded-xl font-semibold text-lg shadow hover:from-yellow-500 hover:to-yellow-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </span>
-              ) : (
-                isLogin ? 'Sign In' : 'Create Account'
-              )}
-            </button>
+            {/* Submit Error Display */}
+                      {errors.submit && (
+            <div className="bg-red-900/50 border-2 border-red-500 rounded-xl p-4 mb-4">
+              <p className="text-red-300 font-semibold text-center">{errors.submit}</p>
+            </div>
+          )}
+
+                                                   {/* Submit button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-4 rounded-xl font-bold text-lg shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                  isLogin 
+                    ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-700 hover:to-orange-700 border-2 border-red-500/30' 
+                    : 'bg-gradient-to-r from-gray-700 to-gray-800 text-white hover:from-gray-600 hover:to-gray-700 border-2 border-gray-600'
+                }`}
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  isLogin ? 'Sign In' : 'Create Account'
+                )}
+              </button>
 
             {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300/30 dark:border-gray-700/30"></div>
+                <div className="w-full border-t border-gray-600"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-gray-900/60">Or continue with</span>
+                <span className="px-4 text-gray-300 font-semibold bg-gray-900/90 rounded-full">Or continue with</span>
               </div>
             </div>
 
             {/* Social Login Buttons */}
             <div className="space-y-4">
-              {/* Google Login Button */}
-              <GoogleLoginButton
-                onSuccess={handleGoogleLoginSuccess}
-                text="Continue with Google"
-                className="bg-white/90 hover:bg-white border-gray-300/30 text-gray-800 py-3 font-semibold shadow"
-              />
+                             {/* Google Login Button */}
+               <GoogleLoginButton
+                 onSuccess={handleGoogleLoginSuccess}
+                 text="Continue with Google"
+                 className="w-full bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white py-3 font-bold shadow-xl rounded-xl transform hover:scale-105 transition-all duration-200 border-2 border-gray-600"
+               />
 
-              {/* Guest Login Button */}
-              <button
-                type="button"
-                onClick={handleGuestLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white/70 dark:bg-gray-800/70 border border-gray-300/50 dark:border-gray-600/50 text-gray-800 dark:text-white py-3 rounded-xl font-semibold shadow hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
-              >
-                <User className="h-5 w-5" />
-                Continue as Guest
-              </button>
+                                                           {/* Guest Login Button */}
+                <button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white py-3 rounded-xl font-bold shadow-xl transform hover:scale-105 transition-all duration-200 border-2 border-gray-600"
+                >
+                  <User className="h-5 w-5" />
+                  Continue as Guest
+                </button>
             </div>
           </form>
 
+
+
           {/* Toggle between login and register */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-yellow-500 hover:text-yellow-400 font-medium transition-colors duration-200"
-            >
-              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-            </button>
+          <div className="mt-6 text-center">
+            {role === 'delivery' ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-gray-300 hover:text-white font-bold transition-colors duration-200 block underline decoration-2 underline-offset-4"
+                >
+                  {isLogin ? "Don't have a delivery account? Register" : 'Already have a delivery account? Sign in'}
+                </button>
+                {!isLogin && (
+                  <button
+                    onClick={() => router.push('/register-delivery')}
+                    className="text-orange-400 hover:text-orange-300 font-semibold transition-colors duration-200 text-sm underline"
+                  >
+                    Go to full delivery registration →
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-gray-300 hover:text-white font-bold transition-colors duration-200 underline decoration-2 underline-offset-4"
+              >
+                {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              </button>
+            )}
           </div>
         </div>
       </div>

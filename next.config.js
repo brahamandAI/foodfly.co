@@ -46,6 +46,9 @@ const nextConfig = {
   
   // Optimize webpack configuration
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Handle symlinks on Windows
+    config.resolve.symlinks = false;
+    
     // Handle client-side fallbacks
     if (!isServer) {
       config.resolve.fallback = {
@@ -99,6 +102,8 @@ const nextConfig = {
   experimental: {
     // Optimize for server components
     serverComponentsExternalPackages: ['mongoose'],
+    // Fix symlink issues on Windows/OneDrive
+    esmExternals: 'loose',
   },
   
   // Headers for security

@@ -52,7 +52,11 @@ export async function GET(request: NextRequest) {
       avgOrderValue,
       deliveryTimeData,
       ordersByDay,
-      cuisineData
+      cuisineData,
+      totalDeliveryPartners,
+      activeDeliveryPartners,
+      totalChefs,
+      activeChefs
     ] = await Promise.all([
       // Total orders
       Order.countDocuments({}),
@@ -195,7 +199,25 @@ export async function GET(request: NextRequest) {
         },
         { $sort: { orderCount: -1 } },
         { $limit: 5 }
-      ])
+      ]),
+
+      // Total delivery partners
+      User.countDocuments({ role: 'delivery' }),
+
+      // Active delivery partners (available or on delivery)
+      User.countDocuments({ 
+        role: 'delivery',
+        'deliveryProfile.isActive': true 
+      }),
+
+      // Total chefs
+      User.countDocuments({ role: 'chef' }),
+
+      // Active/available chefs
+      User.countDocuments({ 
+        role: 'chef',
+        'chefProfile.availability.status': { $in: ['available', 'busy'] }
+      })
     ]);
 
     // Calculate average rating from orders that have ratings
@@ -280,6 +302,18 @@ export async function GET(request: NextRequest) {
       
       ordersByStatus: orderStatusBreakdown,
       
+      // Delivery Partner Stats
+      totalDeliveryPartners,
+      activeDeliveryPartners,
+      avgDeliveryTime: Math.round(avgDeliveryMinutes),
+      deliveryPartnerRating: averageRating, // Could be calculated separately if needed
+      
+      // Chef Stats
+      totalChefs,
+      activeChefs,
+      avgChefRating: averageRating, // Could be calculated separately if needed
+      totalChefBookings: 0, // Would need chef booking model
+      
       // System health indicators (calculated from real data)
       systemHealth: {
         averageDeliveryTime: Math.round(avgDeliveryMinutes),
@@ -291,7 +325,7 @@ export async function GET(request: NextRequest) {
       // Business insights (calculated from real data)
       insights: {
         topPaymentMethod: Object.entries(paymentMethodBreakdown)
-          .sort(([,a], [,b]) => b - a)[0]?.[0] || 'cod',
+          .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'cod',
         dailyAverageOrders: Math.round(monthlyOrders / 30),
         peakOrderDay: peakDay,
         popularRestaurant: popularRestaurant

@@ -144,6 +144,48 @@
     font-weight: 700;
     color: #ffffff;
   }
+
+  /* Form input styles - ensure proper contrast */
+  input, textarea, select {
+    color: inherit;
+  }
+
+  /* Dark theme form inputs */
+  input[class*="bg-gray-800"], 
+  textarea[class*="bg-gray-800"], 
+  select[class*="bg-gray-800"] {
+    color: #ffffff !important;
+  }
+
+  /* Light theme form inputs */
+  input[class*="bg-white"], 
+  textarea[class*="bg-white"], 
+  select[class*="bg-white"] {
+    color: #111827 !important;
+  }
+
+  /* Default form inputs without specific background classes */
+  input:not([class*="bg-"]), 
+  textarea:not([class*="bg-"]), 
+  select:not([class*="bg-"]) {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #d1d5db;
+  }
+
+  /* Placeholder text */
+  input::placeholder,
+  textarea::placeholder,
+  select::placeholder {
+    color: #6b7280;
+  }
+
+  /* Dark theme placeholders */
+  input[class*="bg-gray-800"]::placeholder,
+  textarea[class*="bg-gray-800"]::placeholder,
+  select[class*="bg-gray-800"]::placeholder {
+    color: #9ca3af;
+  }
 }
 
 /* Modal and popup styles */

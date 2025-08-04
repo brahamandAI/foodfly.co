@@ -178,11 +178,14 @@ export interface Order {
 
 // UNIFIED CART SERVICE - Works for both guest and authenticated users
 export const unifiedCartService = {
-  // Check if user is authenticated (real token, not guest)
+  // Check if user is authenticated (real token, not guest, not chef)
   isAuthenticated: (): boolean => {
     const token = localStorage.getItem('token');
     const isGuest = localStorage.getItem('guest') === 'true';
-    return !!(token && !isGuest);
+    const isChef = localStorage.getItem('chef-token') || localStorage.getItem('chef-userType') === 'chef';
+    
+    // Return true only for regular authenticated users (not guests, not chefs)
+    return !!(token && !isGuest && !isChef);
   },
 
   // Check if user is logged in (includes guests)
@@ -233,9 +236,7 @@ export const unifiedCartService = {
         return {
           items: data.cart.items || [],
           subtotal: data.cart.subtotal || 0,
-          totalItems: data.cart.totalItems || 0,
-          restaurantId: data.cart.restaurantId,
-          restaurantName: data.cart.restaurantName
+          totalItems: data.cart.totalItems || 0
         };
       } catch (error) {
         console.error('Database cart error, falling back to localStorage:', error);
@@ -1599,7 +1600,7 @@ export const authService = {
         name: userData.name.trim(),
         email: userData.email.trim().toLowerCase(),
         password: userData.password,
-        role: 'user' // Explicitly set role
+        role: 'customer' // Explicitly set role for normal users
       };
 
       const response = await fetch(`/api/auth/register`, {
@@ -2111,7 +2112,7 @@ export const authApi = {
         name: userData.name.trim(),
         email: userData.email.trim().toLowerCase(),
         password: userData.password,
-        role: 'user'
+        role: 'customer'
       };
 
       console.log('Attempting registration with:', { email: formattedData.email, data: formattedData });

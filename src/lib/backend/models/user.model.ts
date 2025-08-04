@@ -15,13 +15,60 @@ export interface IAddress {
   createdAt?: Date;
 }
 
+export interface IDeliveryProfile {
+  vehicleType: 'bike' | 'bicycle' | 'scooter' | 'car' | 'walking';
+  vehicleNumber?: string;
+  currentZone: string;
+  profilePhoto?: string;
+  govtIdProof?: {
+    type: 'aadhar' | 'pan' | 'driving_license' | 'other';
+    number: string;
+    verified: boolean;
+    document?: string; // URL to uploaded document
+  };
+  isVerified: boolean;
+  isActive: boolean;
+  rating?: number;
+  totalDeliveries: number;
+  joinedAt: Date;
+  
+  // Availability and assignment tracking
+  availability: {
+    status: 'online' | 'offline' | 'busy' | 'break';
+    lastStatusUpdate: Date;
+    shiftStartTime?: Date;
+    shiftEndTime?: Date;
+  };
+  currentLocation?: {
+    type: 'Point';
+    coordinates: [number, number]; // [longitude, latitude]
+    accuracy?: number;
+    lastUpdated: Date;
+  };
+  currentAssignments: {
+    activeOrderId?: string;
+    assignedOrderIds: string[]; // Orders waiting for response
+    maxConcurrentOrders: number;
+  };
+  
+  // Performance metrics
+  performance: {
+    acceptanceRate: number; // percentage
+    avgResponseTime: number; // seconds
+    avgDeliveryTime: number; // minutes
+    completedDeliveries: number;
+    cancelledDeliveries: number;
+    lastDeliveryCompletedAt?: Date;
+  };
+}
+
 export interface IUser extends Document {
   _id: string;
   name: string;
   email: string;
   password: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'user';
+  role: 'customer' | 'admin' | 'user' | 'delivery' | 'chef';
   isEmailVerified: boolean;
   googleId?: string;
   picture?: string;
@@ -38,6 +85,53 @@ export interface IUser extends Document {
     activityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active';
     healthGoals: string[];
   };
+  deliveryProfile?: IDeliveryProfile; // Only for delivery agents
+  chefProfile?: {
+    specialization: string[];
+    experience: number;
+    rating: number;
+    totalEvents: number;
+    priceRange: {
+      min: number;
+      max: number;
+      currency: string;
+    };
+    availability: {
+      status: 'available' | 'busy' | 'offline';
+      weeklySchedule: Map<string, {
+        available: boolean;
+        timeSlots: string[];
+      }>;
+      blackoutDates: Date[];
+    };
+    portfolio: {
+      photos: string[];
+      description: string;
+      signature_dishes: string[];
+    };
+    location: {
+      serviceAreas: string[];
+      currentLocation?: {
+        type: 'Point';
+        coordinates: [number, number];
+      };
+    };
+    verification: {
+      isVerified: boolean;
+      documents: {
+        certifications: string[];
+        experience_letters: string[];
+        health_certificate?: string;
+      };
+    };
+    performance: {
+      acceptanceRate: number;
+      avgResponseTime: number;
+      completedEvents: number;
+      cancelledEvents: number;
+      lastEventCompletedAt?: Date;
+    };
+  }; // Only for chefs
   orderHistory: string[]; // Order IDs
   favoriteRestaurants: string[];
   createdAt: Date;
@@ -97,6 +191,279 @@ const AddressSchema = new Schema<IAddress>({
   }
 });
 
+const DeliveryProfileSchema = new Schema<IDeliveryProfile>({
+  vehicleType: {
+    type: String,
+    enum: ['bike', 'bicycle', 'scooter', 'robo'],
+    required: true
+  },
+  vehicleNumber: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+  currentZone: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  profilePhoto: {
+    type: String,
+    trim: true
+  },
+  govtIdProof: {
+    type: {
+      type: String,
+      enum: ['aadhar', 'pan', 'driving_license', 'other']
+    },
+    number: {
+      type: String,
+      trim: true
+    },
+    verified: {
+      type: Boolean,
+      default: false
+    },
+    document: {
+      type: String,
+      trim: true
+    }
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5
+  },
+  totalDeliveries: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  joinedAt: {
+    type: Date,
+    default: Date.now
+  },
+  
+  // Availability and assignment tracking
+  availability: {
+    status: {
+      type: String,
+      enum: ['online', 'offline', 'busy', 'break'],
+      default: 'offline'
+    },
+    lastStatusUpdate: {
+      type: Date,
+      default: Date.now
+    },
+    shiftStartTime: {
+      type: Date
+    },
+    shiftEndTime: {
+      type: Date
+    }
+  },
+  currentLocation: {
+    type: {
+      type: String,
+      enum: ['Point']
+    },
+    coordinates: {
+      type: [Number]
+    },
+    accuracy: {
+      type: Number
+    },
+    lastUpdated: {
+      type: Date
+    }
+  },
+  currentAssignments: {
+    activeOrderId: {
+      type: String
+    },
+    assignedOrderIds: [{
+      type: String
+    }],
+    maxConcurrentOrders: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 5
+    }
+  },
+  
+  // Performance metrics
+  performance: {
+    acceptanceRate: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100
+    },
+    avgResponseTime: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    avgDeliveryTime: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    completedDeliveries: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    cancelledDeliveries: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    lastDeliveryCompletedAt: {
+      type: Date
+    }
+  }
+});
+
+const ChefProfileSchema = new Schema({
+  specialization: [{
+    type: String,
+    required: true
+  }],
+  experience: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  rating: {
+    type: Number,
+    default: 5.0,
+    min: 1,
+    max: 5
+  },
+  totalEvents: {
+    type: Number,
+    default: 0
+  },
+  priceRange: {
+    min: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    max: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    currency: {
+      type: String,
+      default: 'INR'
+    }
+  },
+  availability: {
+    status: {
+      type: String,
+      enum: ['available', 'busy', 'offline'],
+      default: 'available'
+    },
+    weeklySchedule: {
+      type: Map,
+      of: {
+        available: Boolean,
+        timeSlots: [String]
+      },
+      default: function() {
+        const schedule = {};
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
+          schedule[day] = {
+            available: true,
+            timeSlots: ['09:00-12:00', '14:00-18:00', '19:00-22:00']
+          };
+        });
+        return schedule;
+      }
+    },
+    blackoutDates: [{
+      type: Date
+    }]
+  },
+  portfolio: {
+    photos: [{
+      type: String
+    }],
+    description: {
+      type: String,
+      maxlength: 1000
+    },
+    signature_dishes: [{
+      type: String
+    }]
+  },
+  location: {
+    serviceAreas: [{
+      type: String,
+      required: true
+    }],
+    currentLocation: {
+      type: {
+        type: String,
+        enum: ['Point']
+      },
+      coordinates: {
+        type: [Number]
+      }
+    }
+  },
+  verification: {
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    documents: {
+      certifications: [{
+        type: String
+      }],
+      experience_letters: [{
+        type: String
+      }],
+      health_certificate: {
+        type: String
+      }
+    }
+  },
+  performance: {
+    acceptanceRate: {
+      type: Number,
+      default: 100
+    },
+    avgResponseTime: {
+      type: Number,
+      default: 30
+    },
+    completedEvents: {
+      type: Number,
+      default: 0
+    },
+    cancelledEvents: {
+      type: Number,
+      default: 0
+    },
+    lastEventCompletedAt: {
+      type: Date
+    }
+  }
+});
+
 const UserSchema = new Schema<IUser>({
   name: {
     type: String,
@@ -125,7 +492,7 @@ const UserSchema = new Schema<IUser>({
   },
   role: {
     type: String,
-    enum: ['customer', 'admin', 'user'],
+    enum: ['customer', 'admin', 'user', 'delivery', 'chef'],
     default: 'customer'
   },
   isEmailVerified: {
@@ -168,6 +535,18 @@ const UserSchema = new Schema<IUser>({
       enum: ['sedentary', 'lightly_active', 'moderately_active', 'very_active']
     },
     healthGoals: [String]
+  },
+  deliveryProfile: {
+    type: DeliveryProfileSchema,
+    required: function() {
+      return this.role === 'delivery';
+    }
+  },
+  chefProfile: {
+    type: ChefProfileSchema,
+    required: function() {
+      return this.role === 'chef';
+    }
   },
   orderHistory: [{
     type: Schema.Types.ObjectId,

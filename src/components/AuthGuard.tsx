@@ -20,8 +20,10 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const isGuest = localStorage.getItem('guest') === 'true';
       
-      const authenticated = !!(token && user && isLoggedIn);
+      // Allow both authenticated users (with token) and guest users
+      const authenticated = !!((token && user && isLoggedIn) || (isGuest && user && isLoggedIn));
       setIsAuthenticated(authenticated);
       setIsLoading(false);
 
@@ -42,9 +44,12 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
     };
 
     const handleAuthStateChange = (e: CustomEvent) => {
-      const { isLoggedIn } = e.detail;
-      setIsAuthenticated(isLoggedIn);
-      if (!isLoggedIn) {
+      const { isLoggedIn, user } = e.detail;
+      // Check if user is guest or authenticated
+      const isGuest = user?.isGuest || localStorage.getItem('guest') === 'true';
+      const authenticated = isLoggedIn && (user || localStorage.getItem('user'));
+      setIsAuthenticated(authenticated);
+      if (!authenticated) {
         const redirectUrl = encodeURIComponent(pathname);
         router.push(`/login?redirect=${redirectUrl}`);
       }
